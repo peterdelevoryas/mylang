@@ -156,7 +156,18 @@ unsafe fn build_stmt(
             };
         }
         Stmt::Expr(x) => {
-            let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
+            let tmp = build_alloca(b, types, x.ty);
+            build_value_into(b, funcs, types, llfuncs, llfunc, locals, x, tmp);
+        }
+    }
+}
+
+unsafe fn build_alloca(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMValueRef {
+    match &types[ty] {
+        Type::Unit => LLVMGetUndef(LLVMVoidType()),
+        _ => {
+            let lltype = build_type(b, types, ty);
+            LLVMBuildAlloca(b, lltype, "\0".as_ptr() as *const i8)
         }
     }
 }
