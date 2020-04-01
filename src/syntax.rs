@@ -24,6 +24,7 @@ pub enum Token {
     PLUS,
     MINUS,
     ELLIPSIS,
+    DOT,
     TYPE,
     STRUCT,
     EOF,
@@ -86,6 +87,7 @@ pub enum Expr {
     String(String),
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(String, Expr)>),
+    Field(Box<Expr>, String),
 }
 
 pub struct Parser<'a> {
@@ -124,6 +126,7 @@ impl<'a> Parser<'a> {
             '*' => (STAR, 1),
             ':' => (COLON, 1),
             '.' if d == '.' && e == '.' => (ELLIPSIS, 3),
+            '.' => (DOT, 1),
             '"' => {
                 let mut escaped = false;
                 let mut n = 1;
@@ -341,8 +344,19 @@ impl<'a> Parser<'a> {
         self.parse_binary(lhs, 0)
     }
 
+    fn parse_field(&mut self) -> Expr {
+        let mut e = self.parse_atom();
+        while self.token == DOT {
+            self.next();
+            let field_name = self.token_string();
+            self.parse(NAME);
+            e = Expr::Field(e.into(), field_name);
+        }
+        e
+    }
+
     fn parse_call(&mut self) -> Expr {
-        let mut x = self.parse_atom();
+        let mut x = self.parse_field();
         while self.token == LPARENS {
             self.next();
 

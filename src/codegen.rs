@@ -151,10 +151,11 @@ unsafe fn build_stmt(
     locals: &[LLVMValueRef],
     stmt: &Stmt,
 ) {
+    println!("building stmt {:?}", stmt);
     match stmt {
         Stmt::Assign(x, y) => {
             let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
-            build_value_into(b, funcs, types, llfuncs, llfunc, locals, x, p);
+            build_value_into(b, funcs, types, llfuncs, llfunc, locals, y, p);
         }
         Stmt::Return(x) => {
             let v = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
@@ -194,8 +195,41 @@ unsafe fn build_value_into(
         Type::Unit => {
             let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
         }
+        Type::Struct(sty) => match &e.kind {
+            ExprKind::Struct(fields) => {
+                let llsty = build_type(b, types, e.ty);
+                for (i, e) in fields {
+                    let dst = LLVMBuildStructGEP2(b, llsty, dst, *i as u32, "\0".as_ptr() as *const i8);
+                    build_value_into(b, funcs, types, llfuncs, llfunc, locals, e, dst);
+                }
+            }
+            _ => {
+                let src = build_place(b, funcs, types, llfuncs, llfunc, locals, e);
+                copy(b, types, e.ty, src, dst);
+            }
+        },
         _ => {
             let v = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
+            LLVMBuildStore(b, v, dst);
+        }
+    }
+}
+
+unsafe fn copy(b: LLVMBuilderRef, types: &[Type], ty: TypeId, src: LLVMValueRef, dst: LLVMValueRef) {
+    match &types[ty] {
+        Type::Struct(sty) => {
+            let llsty = build_type(b, types, ty);
+            for (i, &(_, ty)) in sty.fields.iter().enumerate() {
+                let i = i as u32;
+                let src = LLVMBuildStructGEP2(b, llsty, src, i, "\0".as_ptr() as *const i8);
+                let dst = LLVMBuildStructGEP2(b, llsty, dst, i, "\0".as_ptr() as *const i8);
+                copy(b, types, ty, src, dst);
+            }
+        }
+        Type::Unit => {}
+        _ => {
+            let lltype = build_type(b, types, ty);
+            let v = LLVMBuildLoad2(b, lltype, src, "\0".as_ptr() as *const i8);
             LLVMBuildStore(b, v, dst);
         }
     }
@@ -211,9 +245,12 @@ unsafe fn build_value(
     expr: &Expr
 ) -> LLVMValueRef {
     match &expr.kind {
-        ExprKind::Struct(fields) => {
-            unimplemented!()
+        ExprKind::Field(_, _) => {
+            let p = build_place(b, funcs, types, llfuncs, llfunc, locals, expr);
+            let field_type = build_type(b, types, expr.ty);
+            LLVMBuildLoad2(b, field_type, p, "\0".as_ptr() as *const i8)
         }
+        ExprKind::Struct(fields) => panic!(),
         ExprKind::Unit => {
             LLVMGetUndef(LLVMVoidType())
         }
@@ -282,6 +319,11 @@ unsafe fn build_place(
 ) -> LLVMValueRef {
     match &expr.kind {
         ExprKind::Local(i) => locals[*i],
+        ExprKind::Field(x, i) => {
+            let sty = build_type(b, types, x.ty);
+            let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
+            LLVMBuildStructGEP2(b, sty, p, *i, "\0".as_ptr() as *const i8)
+        }
         k => unimplemented!("{:?}", k),
     }
 }

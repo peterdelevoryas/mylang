@@ -4,11 +4,14 @@ type person struct {
     age: i32,
 }
 
+fn printf(fmt: *i8, ...);
+
 fn main(argc: i32, argv: **i8) -> i32 {
     let bob: person = {
         name: "bob",
         gender: "male",
         age: 32,
     };
+    printf("%s\n", bob.name);
     return 0;
 }

@@ -148,14 +148,14 @@ fn main() {
         };
         func_bodys.push(body);
     }
-    println!("{:?}", struct_types);
-    println!("{:?}", func_decls);
-    println!("{:?}", func_bodys);
+    println!("{:#?}", struct_types);
+    println!("{:#?}", func_decls);
+    println!("{:#?}", func_bodys);
 
     let (func_decls, func_bodys, types) = ir0::build(&struct_types, &func_decls, &func_bodys);
-    println!("{:?}", func_decls);
-    println!("{:?}", func_bodys);
-    println!("{:?}", types);
+    println!("{:#?}", func_decls);
+    println!("{:#?}", func_bodys);
+    println!("{:#?}", types);
 
     unsafe {
         codegen::emit_object(&func_decls, &func_bodys, &types);
