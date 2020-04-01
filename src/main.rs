@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 mod syntax;
 mod ir0;
+mod codegen;
 
 fn usage() {
     println!("\
@@ -133,4 +134,31 @@ fn main() {
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
     println!("{:?}", types);
+
+    unsafe {
+        codegen::emit_object(&func_decls, &func_bodys, &types);
+    }
+
+    ld("a.o", "a.out");
+    let _ = fs::remove_file("a.o");
+}
+
+fn ld(path: &str, out: &str) {
+    use std::process::Command;
+    let mut gcc = Command::new("gcc");
+    gcc.arg(path);
+    gcc.arg("-o");
+    gcc.arg(out);
+
+    let output = match gcc.output() {
+        Err(e) => {
+            println!("error linking object file: {}", e);
+            error();
+        }
+        Ok(x) => x,
+    };
+
+    let stdout = std::string::String::from_utf8_lossy(&output.stdout);
+    let stderr = std::string::String::from_utf8_lossy(&output.stderr);
+    print!("{}{}", stdout, stderr);
 }
