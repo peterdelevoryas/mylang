@@ -137,12 +137,58 @@ impl<'a> FuncBuilder<'a> {
                 let e = self.build_expr(e, Some(ret));
                 Stmt::Return(e)
             }
+            syntax::Stmt::Expr(e) => {
+                let e = self.build_expr(e, None);
+                Stmt::Expr(e)
+            }
         };
         self.body.stmts.push(stmt);
     }
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Call(func, args) => {
+                // Infer function type.
+                let func = self.build_expr(func, None);
+                let fnty = match self.module.types.get(func.ty) {
+                    Type::Func(fnty) => fnty.clone(),
+                    _ => panic!(),
+                };
+                // Verify return type matches environment type.
+                if let Some(ret) = env {
+                    if fnty.ret != ret {
+                        panic!("return type doesn't match");
+                    }
+                }
+                // Verify number of call args count.
+                if fnty.var_args {
+                    if args.len() < fnty.params.len() {
+                        println!("var args function requires {} params, got {}",
+                            fnty.params.len(), args.len());
+                        error();
+                    }
+                } else {
+                    if args.len() != fnty.params.len() {
+                        println!("function has {} params, but {} args were supplied",
+                            fnty.params.len(), args.len());
+                        error();
+                    }
+                }
+                // Verify arg types match inferred function type.
+                let mut args2 = vec![];
+                for (arg, &ty) in args.iter().zip(&fnty.params) {
+                    let arg = self.build_expr(arg, Some(ty));
+                    args2.push(arg);
+                }
+                // Var args params don't get type checked.
+                for arg in &args[fnty.params.len()..] {
+                    let arg = self.build_expr(arg, None);
+                    args2.push(arg);
+                }
+                let args = args2;
+
+                (ExprKind::Call(func.into(), args), fnty.ret)
+            }
             syntax::Expr::String(s) => {
                 let i8 = self.module.types.intern(Type::I8);
                 let ptr_i8 = self.module.types.intern(Type::Pointer(i8));
@@ -296,6 +342,7 @@ pub struct FuncBody {
 pub enum Stmt {
     Assign(Expr, Expr),
     Return(Expr),
+    Expr(Expr),
 }
 
 #[derive(Debug)]
@@ -319,4 +366,5 @@ pub enum ExprKind {
     Local(LocalId),
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
+    Call(Box<Expr>, Vec<Expr>),
 }

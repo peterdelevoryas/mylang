@@ -65,6 +65,7 @@ pub struct Block {
 pub enum Stmt {
     Let(String, Option<Type>, Expr),
     Return(Expr),
+    Expr(Expr),
 }
 
 #[derive(Debug)]
@@ -73,6 +74,7 @@ pub enum Expr {
     Name(String),
     Binary(Token, Box<Expr>, Box<Expr>),
     String(String),
+    Call(Box<Expr>, Vec<Expr>),
 }
 
 pub struct Parser<'a> {
@@ -255,9 +257,8 @@ impl<'a> Parser<'a> {
                 Stmt::Return(e)
             }
             _ => {
-                print_cursor(self.text, self.start, self.end);
-                println!("expected statement");
-                error();
+                let e = self.parse_expr();
+                Stmt::Expr(e)
             }
         }
     }
@@ -274,7 +275,7 @@ impl<'a> Parser<'a> {
             let op = self.token;
             let i = precedence(op);
             self.next();
-            let mut rhs = self.parse_atom();
+            let mut rhs = self.parse_call();
             while precedence(self.token) > i {
                 let j = precedence(self.token);
                 rhs = self.parse_binary(rhs, j);
@@ -287,8 +288,30 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let lhs = self.parse_atom();
+        let lhs = self.parse_call();
         self.parse_binary(lhs, 0)
+    }
+
+    fn parse_call(&mut self) -> Expr {
+        let mut x = self.parse_atom();
+        while self.token == LPARENS {
+            self.next();
+
+            let mut args = vec![];
+            while self.token != RPARENS {
+                let arg = self.parse_expr();
+                args.push(arg);
+
+                if self.token != COMMA {
+                    break;
+                }
+                self.next();
+            }
+            self.parse(RPARENS);
+
+            x = Expr::Call(x.into(), args);
+        }
+        x
     }
 
     fn parse_atom(&mut self) -> Expr {

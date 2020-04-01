@@ -152,6 +152,9 @@ unsafe fn build_stmt(
             let v = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
             LLVMBuildRet(b, v);
         }
+        Stmt::Expr(x) => {
+            let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
+        }
     }
 }
 
@@ -196,6 +199,22 @@ unsafe fn build_value(
             let name = "\0".as_ptr() as *const i8;
             LLVMBuildGlobalStringPtr(b, s, name)
         }
+        ExprKind::Call(func, args) => {
+            let fnty = match &types[func.ty] {
+                Type::Func(fnty) => build_func_type(b, types, fnty),
+                _ => panic!(),
+            };
+            let func = build_value(b, funcs, types, llfuncs, llfunc, locals, func);
+            let mut args2 = vec![];
+            for arg in args {
+                let arg = build_value(b, funcs, types, llfuncs, llfunc, locals, arg);
+                args2.push(arg);
+            }
+            let mut args = args2;
+            let name = "\0".as_ptr() as *const i8;
+            LLVMBuildCall2(b, fnty, func, args.as_mut_ptr(), args.len() as u32, name)
+        }
+        ExprKind::Func(i) => llfuncs[*i],
         x => unimplemented!("{:?}", x),
     }
 }
