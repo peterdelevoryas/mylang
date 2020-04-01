@@ -179,7 +179,16 @@ unsafe fn build_value(
             let lltype = build_type(b, types, expr.ty);
             LLVMBuildLoad2(b, lltype, locals[*i], "\0".as_ptr() as *const i8)
         }
-        _ => unimplemented!(),
+        ExprKind::Binary(op, x, y) => {
+            let x = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
+            let y = build_value(b, funcs, types, llfuncs, llfunc, locals, y);
+            let name = "\0".as_ptr() as *const i8;
+            match op {
+                Binop::Add => LLVMBuildAdd(b, x, y, name),
+                Binop::Sub => LLVMBuildSub(b, x, y, name),
+            }
+        }
+        x => unimplemented!("{:?}", x),
     }
 }
 

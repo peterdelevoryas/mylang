@@ -1,4 +1,4 @@
 fn main(argc: i32, argv: **i8) -> i32 {
-    let x: i32 = 3;
+    let x: i32 = 2 + 2;
     return x;
 }

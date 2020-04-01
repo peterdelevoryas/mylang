@@ -20,6 +20,8 @@ pub enum Token {
     RETURN,
     NAME,
     INTEGER,
+    PLUS,
+    MINUS,
     EOF,
 }
 pub use Token::*;
@@ -60,6 +62,7 @@ pub enum Stmt {
 pub enum Expr {
     Integer(String),
     Name(String),
+    Binary(Token, Box<Expr>, Box<Expr>),
 }
 
 pub struct Parser<'a> {
@@ -85,6 +88,8 @@ impl<'a> Parser<'a> {
 
         let (token, n) = match c {
             '-' if d == '>' => (ARROW, 2),
+            '-' => (MINUS, 1),
+            '+' => (PLUS, 1),
             '(' => (LPARENS, 1),
             ')' => (RPARENS, 1),
             '{' => (LBRACE, 1),
@@ -214,7 +219,36 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_binary(&mut self, mut lhs: Expr, min_precedence: i32) -> Expr {
+        fn precedence(op: Token) -> i32 {
+            match op {
+                PLUS | MINUS => 20,
+                _ => -1,
+            }
+        }
+
+        while precedence(self.token) >= min_precedence {
+            let op = self.token;
+            let i = precedence(op);
+            self.next();
+            let mut rhs = self.parse_atom();
+            while precedence(self.token) > i {
+                let j = precedence(self.token);
+                rhs = self.parse_binary(rhs, j);
+            }
+
+            lhs = Expr::Binary(op, lhs.into(), rhs.into());
+        }
+
+        lhs
+    }
+
     fn parse_expr(&mut self) -> Expr {
+        let lhs = self.parse_atom();
+        self.parse_binary(lhs, 0)
+    }
+
+    fn parse_atom(&mut self) -> Expr {
         match self.token {
             INTEGER => {
                 let s = self.token_string();
