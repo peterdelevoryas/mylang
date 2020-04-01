@@ -232,6 +232,10 @@ impl<'a> FuncBuilder<'a> {
                     Def::Local(i) => {
                         (ExprKind::Local(i), self.body.locals[i])
                     }
+                    Def::Param(i) => {
+                        let ty = self.module.func_decls[self.body.id].ty.params[i];
+                        (ExprKind::Param(i), ty)
+                    }
                     _ => unimplemented!(),
                 },
             }

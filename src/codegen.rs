@@ -215,6 +215,9 @@ unsafe fn build_value(
             LLVMBuildCall2(b, fnty, func, args.as_mut_ptr(), args.len() as u32, name)
         }
         ExprKind::Func(i) => llfuncs[*i],
+        ExprKind::Param(i) => {
+            LLVMGetParam(llfunc, *i as u32)
+        }
         x => unimplemented!("{:?}", x),
     }
 }

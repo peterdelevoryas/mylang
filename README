@@ -1,7 +1,6 @@
 fn printf(fmt: *i8, ...) -> i32;
 
 fn main(argc: i32, argv: **i8) -> i32 {
-    let s = "hello world %d\n";
-    printf(s, 2);
+    printf("argc: %d\n", argc);
     return 0;
 }
