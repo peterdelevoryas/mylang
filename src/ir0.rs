@@ -75,7 +75,7 @@ pub fn build(funcs: &[syntax::Func]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>
     }
 
     let mut func_bodys = vec![];
-    for id in 0..b.func_decls.len() {
+    for (id, func) in funcs.iter().enumerate() {
         let body = FuncBody {
             id: id,
             locals: vec![],
@@ -85,7 +85,8 @@ pub fn build(funcs: &[syntax::Func]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>
             module: &mut b,
             body: body,
         };
-        func_bodys.push(b.build());
+        let body = b.build_body(&func.body);
+        func_bodys.push(body);
     }
 
     (b.func_decls, func_bodys, b.types.types)
@@ -97,8 +98,92 @@ struct FuncBuilder<'a> {
 }
 
 impl<'a> FuncBuilder<'a> {
-    fn build(mut self) -> FuncBody {
+    fn build_body(mut self, block: &syntax::Block) -> FuncBody {
+        let scope = self.module.names.enter_scope();
+        let decl = &self.module.func_decls[self.body.id];
+        for (i, name) in decl.params.iter().enumerate() {
+            self.module.names.def(*name, Def::Param(i));
+        }
+        self.build_block(block);
+        self.module.names.exit_scope(scope);
+
         self.body
+    }
+
+    fn build_block(&mut self, block: &syntax::Block) {
+        let scope = self.module.names.enter_scope();
+        for stmt in &block.stmts {
+            self.build_stmt(stmt);
+        }
+        self.module.names.exit_scope(scope);
+    }
+
+    fn build_stmt(&mut self, stmt: &syntax::Stmt) {
+        let stmt = match stmt {
+            syntax::Stmt::Let(name, ty, e) => {
+                let ty = ty.as_ref().map(|ty| self.module.build_type(ty));
+                let e = self.build_expr(e, ty);
+                let i = self.body.locals.len();
+                let x = Expr {
+                    kind: ExprKind::Local(i),
+                    ty: e.ty,
+                };
+                self.body.locals.push(x.ty);
+                self.module.names.def(*name, Def::Local(i));
+                Stmt::Assign(x, e)
+            }
+            syntax::Stmt::Return(e) => {
+                let ret = self.module.func_decls[self.body.id].ty.ret;
+                let e = self.build_expr(e, Some(ret));
+                Stmt::Return(e)
+            }
+        };
+        self.body.stmts.push(stmt);
+    }
+
+    fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
+        let (kind, ty) = match e {
+            syntax::Expr::Integer(s) => {
+                let ty = match env {
+                    None => self.module.types.intern(Type::I32),
+                    Some(ty) => match self.module.types.get(ty) {
+                        Type::I8 | Type::I32 => ty,
+                        _ => self.module.types.intern(Type::I32),
+                    }
+                };
+                (ExprKind::Integer(*s), ty)
+            },
+            syntax::Expr::Name(name) => match self.module.names.get(*name) {
+                None => {
+                    println!("undefined symbol {:?}", name);
+                    error();
+                }
+                Some(def) => match def {
+                    Def::Func(i) => {
+                        let ty = self.module.types.intern({
+                            let ty = &self.module.func_decls[i].ty;
+                            let ty = ty.clone();
+                            Type::Func(ty)
+                        });
+                        (ExprKind::Func(i), ty)
+                    }
+                    Def::Local(i) => {
+                        (ExprKind::Local(i), self.body.locals[i])
+                    }
+                    _ => unimplemented!(),
+                },
+            }
+        };
+        if let Some(env) = env {
+            if ty != env {
+                println!("expected {:?}, got {:?}",
+                    self.module.types.get(env),
+                    self.module.types.get(ty)
+                );
+                error();
+            }
+        }
+        Expr { kind, ty }
     }
 }
 
@@ -124,6 +209,7 @@ impl ModuleBuilder {
         let func_decl = FuncDecl {
             name: func.name,
             ty: func_type,
+            params: func.params.clone(),
         };
         self.func_decls.push(func_decl);
     }
@@ -135,7 +221,8 @@ impl ModuleBuilder {
                 _ => panic!(),
             }
             syntax::Type::Pointer(ty) => {
-                unimplemented!()
+                let ty = self.build_type(ty);
+                self.types.intern(Type::Pointer(ty))
             }
             syntax::Type::Func(ty) => {
                 unimplemented!()
@@ -159,7 +246,7 @@ pub enum Type {
     I8,
     I32,
     Pointer(TypeId),
-    Func(TypeId),
+    Func(FuncType),
 }
 
 pub type TypeId = usize;
@@ -176,13 +263,14 @@ pub struct FuncType {
 #[derive(Debug)]
 pub struct FuncDecl {
     pub name: String,
+    pub params: Vec<String>,
     pub ty: FuncType,
 }
 
 #[derive(Debug)]
 pub struct FuncBody {
     pub id: FuncId,
-    pub locals: Vec<Type>,
+    pub locals: Vec<TypeId>,
     pub stmts: Vec<Stmt>,
 }
 
@@ -193,7 +281,13 @@ pub enum Stmt {
 }
 
 #[derive(Debug)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub ty: TypeId,
+}
+
+#[derive(Debug)]
+pub enum ExprKind {
     Integer(String),
     Param(ParamId),
     Func(FuncId),
