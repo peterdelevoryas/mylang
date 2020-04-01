@@ -145,7 +145,7 @@ impl<'a> Parser<'a> {
         let name = self.token_string();
         self.parse(NAME);
 
-        let mut params = Vec::new();
+        let mut params = vec![];
         let param_types = self.parse_list(|p| {
             let name = p.token_string();
             p.parse(NAME);
@@ -262,7 +262,7 @@ impl<'a> Parser<'a> {
         separator: Token
     ) -> Vec<T> {
         self.parse(start);
-        let mut list = Vec::new();
+        let mut list = vec![];
         while self.token != end {
             let elem = parse_elem(self);
             list.push(elem);

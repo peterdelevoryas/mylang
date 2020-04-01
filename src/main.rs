@@ -7,6 +7,7 @@ use std::fmt;
 use std::ops::Deref;
 
 mod syntax;
+mod ir0;
 
 fn usage() {
     println!("\
@@ -126,6 +127,10 @@ fn main() {
         let func = p.parse_func();
         funcs.push(func);
     }
-
     println!("{:?}", funcs);
+
+    let (func_decls, func_bodys, types) = ir0::build(&funcs);
+    println!("{:?}", func_decls);
+    println!("{:?}", func_bodys);
+    println!("{:?}", types);
 }
