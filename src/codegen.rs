@@ -6,12 +6,18 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::ptr;
 
+macro_rules! cstr {
+    ($s:expr) => ({
+        concat!($s, "\0").as_ptr() as *const i8
+    })
+}
+
 pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], types: &[Type]) {
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
-    let module = LLVMModuleCreateWithName("a\0".as_ptr() as *const i8);
+    let module = LLVMModuleCreateWithName(cstr!("a"));
 
     let triple = LLVMGetDefaultTargetTriple();
     let mut target = MaybeUninit::uninit().assume_init();
@@ -22,8 +28,8 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
         error();
     }
 
-    let cpu = "generic\0".as_ptr() as *const i8;
-    let features = "\0".as_ptr() as *const i8;
+    let cpu = cstr!("generic");
+    let features = cstr!("");
     let machine = LLVMCreateTargetMachine(
         target,
         triple,
@@ -38,10 +44,11 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
     LLVMSetTarget(module, triple);
 
     let b = LLVMCreateBuilder();
+    let type_bld = &TypeBuilder::new(types);
 
     let mut llfuncs = vec![];
     for func_decl in func_decls {
-        let lltype = build_func_type(b, types, &func_decl.ty);
+        let lltype = type_bld.func_type(&func_decl.ty);
         let mut name = func_decl.name.deref().to_string();
         name.push('\0');
         let name = name.as_ptr() as *const i8;
@@ -49,8 +56,10 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
         llfuncs.push(llfunc);
     }
     let llfuncs = &llfuncs;
+
     for func_body in func_bodys {
-        build_func_body(b, func_decls, types, llfuncs, func_body);
+        let func_decl = &func_decls[func_body.id];
+        build_func_body(b, type_bld, llfuncs, func_decl, func_body);
     }
 
     LLVMDumpModule(module);
@@ -68,7 +77,7 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
     if LLVMTargetMachineEmitToFile(
         machine,
         module,
-        "a.o\0".as_ptr() as *mut i8,
+        cstr!("a.o") as *mut i8,
         LLVMCodeGenFileType_LLVMObjectFile,
         &mut msg,
     ) != 0
@@ -79,80 +88,125 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
     }
 }
 
-unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeRef {
-    match &types[ty] {
-        Type::I8 => LLVMInt8Type(),
-        Type::I16 => LLVMInt16Type(),
-        Type::I32 => LLVMInt32Type(),
-        Type::I64 => LLVMInt64Type(),
-        Type::F32 => LLVMFloatType(),
-        Type::F64 => LLVMDoubleType(),
-        Type::Pointer(ty) => {
-            let lltype = build_type(b, types, *ty);
-            LLVMPointerType(lltype, 0)
-        }
-        Type::Func(ty) => build_func_type(b, types, ty),
-        Type::Unit => LLVMVoidType(),
-        Type::Struct(ty) => {
-            let mut elem_types = vec![];
-            for (_, ty) in &ty.fields {
-                let ty = build_type(b, types, *ty);
-                elem_types.push(ty);
-            }
-            LLVMStructType(elem_types.as_mut_ptr(), elem_types.len() as u32, 0)
-        }
-    }
+struct TypeBuilder<'a> {
+    lltypes: Vec<LLVMTypeRef>,
+    types: &'a [Type],
 }
 
-unsafe fn build_func_type(b: LLVMBuilderRef, types: &[Type], ty: &FuncType) -> LLVMTypeRef {
-    let mut params = vec![];
-    for ty in &ty.params {
-        let mut lltype = build_type(b, types, *ty);
-        if let Type::Struct(_) = types[*ty] {
-            lltype = LLVMPointerType(lltype, 0);
+impl<'a> TypeBuilder<'a> {
+    unsafe fn new(types: &'a [Type]) -> Self {
+        let mut b = TypeBuilder {
+            lltypes: vec![],
+            types: types,
+        };
+        for type_id in 0..types.len() {
+            let lltype = b.build_type(type_id);
+            b.lltypes.push(lltype);
         }
-        params.push(lltype);
+        b
     }
-    let mut ret = build_type(b, types, ty.ret);
-    if let Type::Struct(_) = types[ty.ret] {
-        let sret = LLVMPointerType(ret, 0);
-        params.push(sret);
-        ret = LLVMVoidType();
+
+    unsafe fn build_type(&self, ty: TypeId) -> LLVMTypeRef {
+        match self.irtype(ty) {
+            Type::I8 => LLVMInt8Type(),
+            Type::I16 => LLVMInt16Type(),
+            Type::I32 => LLVMInt32Type(),
+            Type::I64 => LLVMInt64Type(),
+            Type::F32 => LLVMFloatType(),
+            Type::F64 => LLVMDoubleType(),
+            Type::Pointer(ty) => {
+                let lltype = self.build_type(*ty);
+                LLVMPointerType(lltype, 0)
+            }
+            Type::Func(ty) => self.func_type(ty),
+            Type::Unit => LLVMVoidType(),
+            Type::Struct(ty) => {
+                let mut elem_types = vec![];
+                for (_, ty) in &ty.fields {
+                    let ty = self.build_type(*ty);
+                    elem_types.push(ty);
+                }
+                LLVMStructType(elem_types.as_mut_ptr(), elem_types.len() as u32, 0)
+            }
+        }
     }
-    let var_args = if ty.var_args { 1 } else { 0 };
-    LLVMFunctionType(ret, params.as_mut_ptr(), params.len() as u32, var_args)
+
+    fn irtype(&self, ty: TypeId) -> &'a Type {
+        &self.types[ty]
+    }
+
+    fn lltype(&self, ty: TypeId) -> LLVMTypeRef {
+        self.lltypes[ty]
+    }
+
+    unsafe fn func_type(&self, func: &FuncType) -> LLVMTypeRef {
+        let mut params = vec![];
+        for &ty in &func.params {
+            let ty = match self.irtype(ty) {
+                Type::Struct(_) => {
+                    let sty = self.lltype(ty);
+                    LLVMPointerType(sty, 0)
+                }
+                Type::Unit => continue,
+                _ => self.lltype(ty),
+            };
+            params.push(ty);
+        }
+
+        let ret = match self.irtype(func.ret) {
+            Type::Struct(_) => {
+                let ret = self.lltype(func.ret);
+                let sret = LLVMPointerType(ret, 0);
+                params.push(sret);
+                LLVMVoidType()
+            }
+            Type::Unit => LLVMVoidType(),
+            _ => self.lltype(func.ret),
+        };
+        let var_args = if func.var_args { 1 } else { 0 };
+
+        LLVMFunctionType(ret, params.as_mut_ptr(), params.len() as u32, var_args)
+    }
 }
 
 unsafe fn build_func_body(
     b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
+    type_bld: &TypeBuilder,
     llfuncs: &[LLVMValueRef],
+    func: &FuncDecl,
     body: &FuncBody,
 ) {
-    let func = &funcs[body.id];
     let llfunc = llfuncs[body.id];
-    let entry = "entry\0".as_ptr() as *const i8;
-    let entry = LLVMAppendBasicBlock(llfunc, entry);
+    let entry = LLVMAppendBasicBlock(llfunc, cstr!("entry"));
     LLVMPositionBuilderAtEnd(b, entry);
 
-    let sret = match types[func.ty.ret] {
-        Type::Struct(_) => LLVMGetParam(llfunc, func.ty.params.len() as u32),
-        _ => LLVMGetUndef(LLVMVoidType()),
+    let sret = match type_bld.irtype(func.ty.ret) {
+        Type::Struct(_) => Some(LLVMGetLastParam(llfunc)),
+        _ => None,
     };
 
     let mut locals = vec![];
-    for ty in &body.locals {
-        let lltype = build_type(b, types, *ty);
-        let name = "\0".as_ptr() as *const i8;
-        let p = LLVMBuildAlloca(b, lltype, name);
+    for &ty in &body.locals {
+        let lltype = type_bld.lltype(ty);
+        let p = LLVMBuildAlloca(b, lltype, cstr!(""));
         locals.push(p);
     }
     let locals = &locals;
 
+    let mut b = StmtBuilder {
+        bld: b,
+        tybld: type_bld,
+
+        llfuncs: llfuncs,
+        llfunc: llfunc,
+        locals: locals,
+        sret: sret,
+    };
     for stmt in &body.stmts {
-        build_stmt(b, funcs, types, llfuncs, llfunc, locals, sret, stmt);
+        b.build_stmt(stmt);
     }
+
+    let b = b.bld;
 
     let term = LLVMGetBasicBlockTerminator(entry);
     if term.is_null() {
@@ -160,257 +214,214 @@ unsafe fn build_func_body(
     }
 }
 
-unsafe fn build_stmt(
-    b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
-    llfuncs: &[LLVMValueRef],
-    llfunc: LLVMValueRef,
-    locals: &[LLVMValueRef],
-    sret: LLVMValueRef,
-    stmt: &Stmt,
-) {
-    println!("building stmt {:?}", stmt);
-    match stmt {
-        Stmt::Assign(x, y) => {
-            let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
-            build_value_into(b, funcs, types, llfuncs, llfunc, locals, y, p);
-        }
-        Stmt::Return(x) => {
-            match &types[x.ty] {
-                Type::Unit => {
-                    let v = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
-                    LLVMBuildRetVoid(b);
-                }
-                Type::Struct(_) => {
-                    build_value_into(b, funcs, types, llfuncs, llfunc, locals, x, sret);
-                    LLVMBuildRetVoid(b);
-                }
-                _ => {
-                    let v = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
-                    LLVMBuildRet(b, v);
-                }
-            };
-        }
-        Stmt::Expr(x) => {
-            let tmp = build_alloca(b, types, x.ty);
-            build_value_into(b, funcs, types, llfuncs, llfunc, locals, x, tmp);
-        }
-    }
-}
+struct StmtBuilder<'a> {
+    bld: LLVMBuilderRef,
+    tybld: &'a TypeBuilder<'a>,
+    llfuncs: &'a [LLVMValueRef],
 
-unsafe fn build_alloca(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMValueRef {
-    match &types[ty] {
-        Type::Unit => LLVMGetUndef(LLVMVoidType()),
-        _ => {
-            let lltype = build_type(b, types, ty);
-            LLVMBuildAlloca(b, lltype, "\0".as_ptr() as *const i8)
-        }
-    }
-}
-
-unsafe fn emit_call(
-    b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
-    llfuncs: &[LLVMValueRef],
     llfunc: LLVMValueRef,
-    locals: &[LLVMValueRef],
-    func: &Expr,
-    args: &[Expr],
+    locals: &'a [LLVMValueRef],
     sret: Option<LLVMValueRef>,
-) -> LLVMValueRef {
-    let fnty = match &types[func.ty] {
-        Type::Func(fnty) => build_func_type(b, types, fnty),
-        _ => panic!(),
-    };
-    let func = build_value(b, funcs, types, llfuncs, llfunc, locals, func);
-    let mut args2 = vec![];
-    for arg in args {
-        match &types[arg.ty] {
-            Type::Struct(sty) => {
-                let tmp = build_alloca(b, types, arg.ty);
-                build_value_into(b, funcs, types, llfuncs, llfunc, locals, arg, tmp);
-                args2.push(tmp);
+}
+
+#[derive(Debug, Copy, Clone)]
+enum Value {
+    Unit,
+    Scalar(LLVMValueRef),
+    Struct(LLVMValueRef),
+}
+
+impl<'a> StmtBuilder<'a> {
+    unsafe fn build_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Assign(x, y) => {
+                let p = self.build_place(x);
+                let _ = self.build_expr(y, Some(p));
+            }
+            Stmt::Return(x) => {
+                let v = self.build_expr(x, self.sret);
+                match v {
+                    Value::Unit => LLVMBuildRetVoid(self.bld),
+                    Value::Struct(_) => LLVMBuildRetVoid(self.bld),
+                    Value::Scalar(v) => LLVMBuildRet(self.bld, v),
+                };
+            }
+            Stmt::Expr(x) => {
+                let _ = self.build_expr(x, None);
+            }
+        }
+    }
+
+    unsafe fn build_place(&mut self, e: &Expr) -> LLVMValueRef {
+        match &e.kind {
+            ExprKind::Local(i) => self.locals[*i],
+            ExprKind::Field(x, i) => {
+                let p = self.build_place(x);
+                let sty = self.tybld.lltype(x.ty);
+                LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
+            }
+            ExprKind::Param(i) => {
+                let ty = self.tybld.lltype(e.ty);
+                let kind = LLVMGetTypeKind(ty);
+                assert_eq!(kind, LLVMTypeKind_LLVMStructTypeKind);
+                LLVMGetParam(self.llfunc, *i as u32)
+            }
+            k => unimplemented!("build place {:?}", k),
+        }
+    }
+
+    unsafe fn build_expr(&mut self, e: &Expr, dst: Option<LLVMValueRef>) -> Value {
+        match self.tybld.irtype(e.ty) {
+            Type::Unit => {
+                self.build_unit(e);
+                Value::Unit
+            }
+            Type::Struct(_) => {
+                let p = match dst {
+                    Some(p) => p,
+                    None => {
+                        let sty = self.tybld.lltype(e.ty);
+                        LLVMBuildAlloca(self.bld, sty, cstr!(""))
+                    }
+                };
+                self.build_struct(e, p);
+                Value::Struct(p)
             }
             _ => {
-                let v = build_value(b, funcs, types, llfuncs, llfunc, locals, arg);
-                args2.push(v);
+                let v = self.build_scalar(e);
+                if let Some(dst) = dst {
+                    LLVMBuildStore(self.bld, v, dst);
+                }
+                Value::Scalar(v)
             }
         }
     }
-    if let Some(sret) = sret {
-        args2.push(sret);
-    }
-    let mut args = args2;
-    let name = "\0".as_ptr() as *const i8;
-    LLVMBuildCall2(b, fnty, func, args.as_mut_ptr(), args.len() as u32, name)
-}
 
-unsafe fn build_value_into(
-    b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
-    llfuncs: &[LLVMValueRef],
-    llfunc: LLVMValueRef,
-    locals: &[LLVMValueRef],
-    e: &Expr,
-    dst: LLVMValueRef,
-) {
-    match &types[e.ty] {
-        Type::Unit => {
-            let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
+    unsafe fn build_call(&mut self, func: &Expr, args: &[Expr], sret: Option<LLVMValueRef>) -> LLVMValueRef {
+        let fnty = self.tybld.lltype(func.ty);
+        let func = self.build_scalar(func);
+        let mut args2 = vec![];
+        for arg in args {
+            let arg = self.build_expr(arg, None);
+            let arg = match arg {
+                Value::Unit => continue,
+                Value::Struct(p) => p,
+                Value::Scalar(v) => v,
+            };
+            args2.push(arg);
         }
-        Type::Struct(sty) => match &e.kind {
+        if let Some(sret) = sret {
+            args2.push(sret);
+        }
+        LLVMBuildCall2(self.bld, fnty, func, args2.as_mut_ptr(), args2.len() as u32, cstr!(""))
+    }
+
+    unsafe fn build_unit(&mut self, e: &Expr) {
+        match &e.kind {
+            ExprKind::Unit => {}
+            ExprKind::Call(func, args) => {
+                let _ = self.build_call(func, args, None);
+            }
+            _ => panic!("expected (), got {:?}", e),
+        }
+    }
+
+    unsafe fn build_struct(&mut self, e: &Expr, dst: LLVMValueRef) {
+        match &e.kind {
             ExprKind::Struct(fields) => {
-                let llsty = build_type(b, types, e.ty);
+                let sty = self.tybld.lltype(e.ty);
                 for (i, e) in fields {
-                    let dst =
-                        LLVMBuildStructGEP2(b, llsty, dst, *i as u32, "\0".as_ptr() as *const i8);
-                    build_value_into(b, funcs, types, llfuncs, llfunc, locals, e, dst);
+                    let i = *i as u32;
+                    let dst = LLVMBuildStructGEP2(self.bld, sty, dst, i, cstr!(""));
+                    let _ = self.build_expr(e, Some(dst));
                 }
             }
             ExprKind::Call(func, args) => {
-                let _ = emit_call(
-                    b,
-                    funcs,
-                    types,
-                    llfuncs,
-                    llfunc,
-                    locals,
-                    func,
-                    args,
-                    Some(dst),
-                );
+                let _ = self.build_call(func, args, Some(dst));
             }
             ExprKind::Param(i) => {
-                let src = LLVMGetParam(llfunc, *i as u32);
-                copy(b, types, e.ty, src, dst);
+                let i = *i as u32;
+                let param = LLVMGetParam(self.llfunc, i);
+                self.copy(e.ty, param, dst);
             }
             _ => {
-                let src = build_place(b, funcs, types, llfuncs, llfunc, locals, e);
-                copy(b, types, e.ty, src, dst);
-            }
-        },
-        _ => {
-            let v = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
-            LLVMBuildStore(b, v, dst);
-        }
-    }
-}
-
-unsafe fn copy(
-    b: LLVMBuilderRef,
-    types: &[Type],
-    ty: TypeId,
-    src: LLVMValueRef,
-    dst: LLVMValueRef,
-) {
-    match &types[ty] {
-        Type::Struct(sty) => {
-            let llsty = build_type(b, types, ty);
-            for (i, &(_, ty)) in sty.fields.iter().enumerate() {
-                let i = i as u32;
-                let src = LLVMBuildStructGEP2(b, llsty, src, i, "\0".as_ptr() as *const i8);
-                let dst = LLVMBuildStructGEP2(b, llsty, dst, i, "\0".as_ptr() as *const i8);
-                copy(b, types, ty, src, dst);
+                let p = self.build_place(e);
+                self.copy(e.ty, p, dst);
             }
         }
-        Type::Unit => {}
-        _ => {
-            let lltype = build_type(b, types, ty);
-            let v = LLVMBuildLoad2(b, lltype, src, "\0".as_ptr() as *const i8);
-            LLVMBuildStore(b, v, dst);
-        }
     }
-}
 
-unsafe fn build_value(
-    b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
-    llfuncs: &[LLVMValueRef],
-    llfunc: LLVMValueRef,
-    locals: &[LLVMValueRef],
-    expr: &Expr,
-) -> LLVMValueRef {
-    match &expr.kind {
-        ExprKind::Field(_, _) => {
-            let p = build_place(b, funcs, types, llfuncs, llfunc, locals, expr);
-            let field_type = build_type(b, types, expr.ty);
-            LLVMBuildLoad2(b, field_type, p, "\0".as_ptr() as *const i8)
-        }
-        ExprKind::Struct(fields) => panic!(),
-        ExprKind::Unit => LLVMGetUndef(LLVMVoidType()),
-        ExprKind::Type(_) => unimplemented!(),
-        ExprKind::Float(s) => {
-            let lltype = build_type(b, types, expr.ty);
-            LLVMConstRealOfStringAndSize(lltype, s.as_ptr() as *const i8, s.len() as u32)
-        }
-        ExprKind::Integer(s) => {
-            let lltype = build_type(b, types, expr.ty);
-            let i: i64 = match s.parse() {
-                Err(e) => {
-                    println!("unable to parse {:?} as integer: {}", s, e);
-                    error();
+    unsafe fn copy(&mut self, ty: TypeId, src: LLVMValueRef, dst: LLVMValueRef) {
+        match self.tybld.irtype(ty) {
+            Type::Unit => {}
+            Type::Struct(sty) => {
+                let llsty = self.tybld.lltype(ty);
+                for (i, &(_, field_ty)) in sty.fields.iter().enumerate() {
+                    let i = i as u32;
+                    let src = LLVMBuildStructGEP2(self.bld, llsty, src, i, cstr!(""));
+                    let dst = LLVMBuildStructGEP2(self.bld, llsty, dst, i, cstr!(""));
+                    self.copy(field_ty, src, dst);
                 }
-                Ok(i) => i,
-            };
-            LLVMConstInt(lltype, i as u64, 0)
-        }
-        ExprKind::Local(i) => {
-            let lltype = build_type(b, types, expr.ty);
-            LLVMBuildLoad2(b, lltype, locals[*i], "\0".as_ptr() as *const i8)
-        }
-        ExprKind::Binary(op, x, y) => {
-            let x = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
-            let y = build_value(b, funcs, types, llfuncs, llfunc, locals, y);
-            let name = "\0".as_ptr() as *const i8;
-            match op {
-                Binop::Add => LLVMBuildAdd(b, x, y, name),
-                Binop::Sub => LLVMBuildSub(b, x, y, name),
+            }
+            _ => {
+                let lltype = self.tybld.lltype(ty);
+                let v = LLVMBuildLoad2(self.bld, lltype, src, cstr!(""));
+                LLVMBuildStore(self.bld, v, dst);
             }
         }
-        ExprKind::String(s) => {
-            let mut s = unescape(s);
-            s.push('\0');
-            let s = s.as_ptr() as *const i8;
-            let name = "\0".as_ptr() as *const i8;
-            LLVMBuildGlobalStringPtr(b, s, name)
-        }
-        ExprKind::Call(func, args) => {
-            emit_call(b, funcs, types, llfuncs, llfunc, locals, func, args, None)
-        }
-        ExprKind::MethodCall(_, _) => unimplemented!(),
-        ExprKind::Func(i) => llfuncs[*i],
-        ExprKind::Param(i) => LLVMGetParam(llfunc, *i as u32),
     }
-}
 
-unsafe fn build_place(
-    b: LLVMBuilderRef,
-    funcs: &[FuncDecl],
-    types: &[Type],
-    llfuncs: &[LLVMValueRef],
-    llfunc: LLVMValueRef,
-    locals: &[LLVMValueRef],
-    expr: &Expr,
-) -> LLVMValueRef {
-    match &expr.kind {
-        ExprKind::Local(i) => locals[*i],
-        ExprKind::Field(x, i) => {
-            let sty = build_type(b, types, x.ty);
-            let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
-            LLVMBuildStructGEP2(b, sty, p, *i, "\0".as_ptr() as *const i8)
-        }
-        ExprKind::Param(i) => {
-            match types[expr.ty] {
-                Type::Struct(_) => {}
-                _ => panic!("trying to evaluate non-struct param as place"),
+    unsafe fn build_scalar(&mut self, e: &Expr) -> LLVMValueRef {
+        match &e.kind {
+            ExprKind::Field(_, _) => {
+                let p = self.build_place(e);
+                let field_type = self.tybld.lltype(e.ty);
+                LLVMBuildLoad2(self.bld, field_type, p, cstr!(""))
             }
-            LLVMGetParam(llfunc, *i as u32)
+            ExprKind::Float(s) => {
+                let lltype = self.tybld.lltype(e.ty);
+                let ptr = s.as_ptr() as *const i8;
+                let len = s.len() as u32;
+                LLVMConstRealOfStringAndSize(lltype, ptr, len)
+            }
+            ExprKind::Integer(s) => {
+                let lltype = self.tybld.lltype(e.ty);
+                let ptr = s.as_ptr() as *const i8;
+                let len = s.len() as u32;
+                let radix = 10;
+                LLVMConstIntOfStringAndSize(lltype, ptr, len, radix)
+            }
+            ExprKind::Local(i) => {
+                let lltype = self.tybld.lltype(e.ty);
+                let p = self.locals[*i];
+                LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
+            }
+            ExprKind::Param(i) => {
+                LLVMGetParam(self.llfunc, *i as u32)
+            }
+            ExprKind::Func(i) => {
+                self.llfuncs[*i]
+            }
+            ExprKind::Binary(op, x, y) => {
+                let x = self.build_scalar(x);
+                let y = self.build_scalar(y);
+                let inst = match op {
+                    Binop::Add => LLVMBuildAdd,
+                    Binop::Sub => LLVMBuildSub,
+                };
+                inst(self.bld, x, y, cstr!(""))
+            }
+            ExprKind::String(s) => {
+                let mut s = unescape(s);
+                s.push('\0');
+                let ptr = s.as_ptr() as *const i8;
+                LLVMBuildGlobalStringPtr(self.bld, ptr, cstr!(""))
+            }
+            ExprKind::Call(func, args) => {
+                self.build_call(func, args, None)
+            }
+            _ => panic!("expected scalar, got {:?}", e),
         }
-        k => unimplemented!("{:?}", k),
     }
 }
 

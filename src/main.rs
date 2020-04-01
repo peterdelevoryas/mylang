@@ -1,5 +1,3 @@
-#![allow(unused_variables, unused_imports, dead_code)]
-
 use std::env;
 use std::fmt;
 use std::fs;

@@ -1,6 +1,5 @@
 use crate::error;
 use crate::intern;
-use crate::print_cursor;
 use crate::syntax;
 use crate::String;
 
@@ -404,7 +403,7 @@ impl ModuleBuilder {
                 let ty = self.build_type(ty);
                 self.types.intern(Type::Pointer(ty))
             }
-            syntax::Type::Func(ty) => unimplemented!(),
+            syntax::Type::Func(_) => unimplemented!(),
             syntax::Type::Unit => self.types.intern(Type::Unit),
         }
     }
@@ -508,7 +507,6 @@ pub enum ExprKind {
     Float(String),
     Param(ParamId),
     Func(FuncId),
-    Type(TypeId),
     Local(LocalId),
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
