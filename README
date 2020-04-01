@@ -14,4 +14,5 @@ fn main() {
         ptr: "hello world",
     };
     printf("len(%s) = %lld\n", s.ptr, len(s));
+    printf("len(%s) = %lld\n", s.ptr, s.len());
 }

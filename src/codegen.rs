@@ -370,6 +370,7 @@ unsafe fn build_value(
         ExprKind::Call(func, args) => {
             emit_call(b, funcs, types, llfuncs, llfunc, locals, func, args, None)
         }
+        ExprKind::MethodCall(_, _) => unimplemented!(),
         ExprKind::Func(i) => llfuncs[*i],
         ExprKind::Param(i) => {
             LLVMGetParam(llfunc, *i as u32)

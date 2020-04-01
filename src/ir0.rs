@@ -165,9 +165,34 @@ impl<'a> FuncBuilder<'a> {
                     Type::Struct(sty) => sty,
                     _ => panic!(),
                 };
-                let i = sty.field_index(*field_name);
-                let ty = sty.fields[i].1;
-                (ExprKind::Field(e.into(), i as u32), ty)
+                if let Some(i) = sty.field_index(*field_name) {
+                    let ty = sty.fields[i].1;
+                    (ExprKind::Field(e.into(), i as u32), ty)
+                } else {
+                    // Try to find a function to use as a method call.
+                    let mut func_id = None;
+                    for (i, func) in self.module.func_decls.iter().enumerate() {
+                        if func.name != *field_name {
+                            continue;
+                        }
+                        if func.ty.params.len() == 0 {
+                            continue;
+                        }
+                        let first_ty = func.ty.params[0];
+                        if first_ty == e.ty {
+                            func_id = Some(i);
+                            break;
+                        }
+                    }
+                    if let Some(i) = func_id {
+                        let mut fnty = self.module.func_decls[i].ty.clone();
+                        fnty.params.remove(0);
+                        let fnty = self.module.types.intern(Type::Func(fnty));
+                        (ExprKind::MethodCall(i, e.into()), fnty)
+                    } else {
+                        panic!("unable to find {:?} on {:?}", field_name, sty.name);
+                    }
+                }
             }
             syntax::Expr::Struct(fields) => {
                 let ty = match env {
@@ -180,7 +205,7 @@ impl<'a> FuncBuilder<'a> {
                 };
                 let mut fields2 = vec![];
                 for (name, e) in fields {
-                    let field_index = sty.field_index(*name);
+                    let field_index = sty.field_index(*name).unwrap();
                     let field_type = sty.fields[field_index].1;
                     let e = self.build_expr(e, Some(field_type));
                     fields2.push((field_index as u32, e));
@@ -189,8 +214,22 @@ impl<'a> FuncBuilder<'a> {
             }
             syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::Expr::Call(func, args) => {
+                let mut func = self.build_expr(func, None);
+                let mut args2 = vec![];
+                func = match func.kind {
+                    ExprKind::MethodCall(i, arg) => {
+                        args2.push(*arg);
+                        let fnty = self.module.func_decls[i].ty.clone();
+                        let fnty = self.module.types.intern(Type::Func(fnty));
+                        Expr {
+                            kind: ExprKind::Func(i),
+                            ty: fnty,
+                        }
+                    }
+                    _ => func,
+                };
+
                 // Infer function type.
-                let func = self.build_expr(func, None);
                 let fnty = match self.module.types.get(func.ty) {
                     Type::Func(fnty) => fnty.clone(),
                     _ => panic!(),
@@ -201,28 +240,29 @@ impl<'a> FuncBuilder<'a> {
                         panic!("return type doesn't match");
                     }
                 }
+                // Account for method call arg
+                let params = &fnty.params[args2.len()..];
                 // Verify number of call args count.
                 if fnty.var_args {
-                    if args.len() < fnty.params.len() {
+                    if args.len() < params.len() {
                         println!("var args function requires {} params, got {}",
-                            fnty.params.len(), args.len());
+                            params.len(), args.len());
                         error();
                     }
                 } else {
-                    if args.len() != fnty.params.len() {
+                    if args.len() != params.len() {
                         println!("function has {} params, but {} args were supplied",
-                            fnty.params.len(), args.len());
+                            params.len(), args.len());
                         error();
                     }
                 }
                 // Verify arg types match inferred function type.
-                let mut args2 = vec![];
-                for (arg, &ty) in args.iter().zip(&fnty.params) {
+                for (arg, &ty) in args.iter().zip(params) {
                     let arg = self.build_expr(arg, Some(ty));
                     args2.push(arg);
                 }
                 // Var args params don't get type checked.
-                for arg in &args[fnty.params.len()..] {
+                for arg in &args[params.len()..] {
                     let arg = self.build_expr(arg, None);
                     args2.push(arg);
                 }
@@ -393,13 +433,13 @@ pub struct StructType {
 }
 
 impl StructType {
-    fn field_index(&self, field_name: String) -> usize {
+    fn field_index(&self, field_name: String) -> Option<usize> {
         for (i, &(name, _)) in self.fields.iter().enumerate() {
             if name == field_name {
-                return i;
+                return Some(i);
             }
         }
-        panic!("failed to find field {:?}", field_name);
+        None
     }
 }
 
@@ -462,4 +502,5 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(u32, Expr)>),
     Field(Box<Expr>, u32),
+    MethodCall(FuncId, Box<Expr>),
 }
