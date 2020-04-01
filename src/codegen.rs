@@ -153,6 +153,11 @@ unsafe fn build_func_body(
     for stmt in &body.stmts {
         build_stmt(b, funcs, types, llfuncs, llfunc, locals, sret, stmt);
     }
+
+    let term = LLVMGetBasicBlockTerminator(entry);
+    if term.is_null() {
+        LLVMBuildRetVoid(b);
+    }
 }
 
 unsafe fn build_stmt(
