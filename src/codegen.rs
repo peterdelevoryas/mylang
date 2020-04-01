@@ -92,6 +92,7 @@ unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeR
             LLVMPointerType(lltype, 0)
         }
         Type::Func(ty) => build_func_type(b, types, ty),
+        Type::Unit => LLVMVoidType(),
     }
 }
 
@@ -144,16 +145,39 @@ unsafe fn build_stmt(
 ) {
     match stmt {
         Stmt::Assign(x, y) => {
-            let v = build_value(b, funcs, types, llfuncs, llfunc, locals, y);
             let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
-            LLVMBuildStore(b, v, p);
+            build_value_into(b, funcs, types, llfuncs, llfunc, locals, x, p);
         }
         Stmt::Return(x) => {
             let v = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
-            LLVMBuildRet(b, v);
+            match &types[x.ty] {
+                Type::Unit => LLVMBuildRetVoid(b),
+                _ => LLVMBuildRet(b, v),
+            };
         }
         Stmt::Expr(x) => {
             let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, x);
+        }
+    }
+}
+
+unsafe fn build_value_into(
+    b: LLVMBuilderRef,
+    funcs: &[FuncDecl],
+    types: &[Type],
+    llfuncs: &[LLVMValueRef],
+    llfunc: LLVMValueRef,
+    locals: &[LLVMValueRef],
+    e: &Expr,
+    dst: LLVMValueRef
+) {
+    match &types[e.ty] {
+        Type::Unit => {
+            let _ = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
+        }
+        _ => {
+            let v = build_value(b, funcs, types, llfuncs, llfunc, locals, e);
+            LLVMBuildStore(b, v, dst);
         }
     }
 }
@@ -168,6 +192,10 @@ unsafe fn build_value(
     expr: &Expr
 ) -> LLVMValueRef {
     match &expr.kind {
+        ExprKind::Unit => {
+            LLVMGetUndef(LLVMVoidType())
+        }
+        ExprKind::Type(_) => unimplemented!(),
         ExprKind::Integer(s) => {
             let lltype = build_type(b, types, expr.ty);
             let i: i64 = match s.parse() {
@@ -218,7 +246,6 @@ unsafe fn build_value(
         ExprKind::Param(i) => {
             LLVMGetParam(llfunc, *i as u32)
         }
-        x => unimplemented!("{:?}", x),
     }
 }
 

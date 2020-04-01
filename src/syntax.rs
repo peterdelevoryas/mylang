@@ -30,6 +30,7 @@ pub use Token::*;
 
 #[derive(Debug, Clone)]
 pub enum Type {
+    Unit,
     Name(String),
     Pointer(Box<Type>),
     Func(Box<FuncType>),
@@ -70,6 +71,7 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
+    Unit,
     Integer(String),
     Name(String),
     Binary(Token, Box<Expr>, Box<Expr>),
@@ -207,8 +209,14 @@ impl<'a> Parser<'a> {
         }
         self.parse(RPARENS);
 
-        self.parse(ARROW);
-        let ret = self.parse_type();
+        let ret = match self.token {
+            ARROW => {
+                self.next();
+                self.parse_type()
+            }
+            _ => Type::Unit,
+        };
+
         let ty = FuncType {
             params: param_types,
             ret: ret.into(),
@@ -316,6 +324,11 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            LPARENS => {
+                self.next();
+                self.parse(RPARENS);
+                Expr::Unit
+            }
             STRING => {
                 let s = self.token_string();
                 self.next();

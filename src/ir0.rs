@@ -147,6 +147,7 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::Expr::Call(func, args) => {
                 // Infer function type.
                 let func = self.build_expr(func, None);
@@ -293,6 +294,7 @@ impl ModuleBuilder {
             syntax::Type::Func(ty) => {
                 unimplemented!()
             }
+            syntax::Type::Unit => self.types.intern(Type::Unit),
         }
     }
 
@@ -314,6 +316,7 @@ pub enum Type {
     I32,
     Pointer(TypeId),
     Func(FuncType),
+    Unit,
 }
 
 pub type TypeId = usize;
@@ -363,6 +366,7 @@ pub enum Binop {
 
 #[derive(Debug)]
 pub enum ExprKind {
+    Unit,
     Integer(String),
     Param(ParamId),
     Func(FuncId),
