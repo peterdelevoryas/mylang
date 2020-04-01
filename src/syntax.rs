@@ -20,6 +20,7 @@ pub enum Token {
     RETURN,
     NAME,
     INTEGER,
+    FLOAT,
     STRING,
     PLUS,
     MINUS,
@@ -82,6 +83,7 @@ pub enum Stmt {
 pub enum Expr {
     Unit,
     Integer(String),
+    Float(String),
     Name(String),
     Binary(Token, Box<Expr>, Box<Expr>),
     String(String),
@@ -165,14 +167,19 @@ impl<'a> Parser<'a> {
                 (token, n)
             }
             _ if c.is_ascii_digit() => {
+                let mut t = INTEGER;
                 let mut n = 0;
                 for c in text {
-                    if !c.is_ascii_digit() {
-                        break;
+                    match (t, c) {
+                        (INTEGER, b'.') => {
+                            t = FLOAT;
+                        }
+                        (_, c) if c.is_ascii_digit() => {}
+                        _ => break,
                     }
                     n += 1;
                 }
-                (INTEGER, n)
+                (t, n)
             }
             _ => {
                 print_cursor(self.text, self.start, self.start + 1);
@@ -406,6 +413,11 @@ impl<'a> Parser<'a> {
                 let s = self.token_string();
                 self.next();
                 Expr::String(s)
+            }
+            FLOAT => {
+                let s = self.token_string();
+                self.next();
+                Expr::Float(s)
             }
             INTEGER => {
                 let s = self.token_string();

@@ -73,6 +73,8 @@ pub fn build(
 
     b.add_type("i8", Type::I8);
     b.add_type("i32", Type::I32);
+    b.add_type("f32", Type::F32);
+    b.add_type("f64", Type::F64);
 
     for struct_type in struct_types {
         b.add_struct_type(struct_type);
@@ -242,6 +244,17 @@ impl<'a> FuncBuilder<'a> {
                 let ty = x.ty;
                 (ExprKind::Binary(op, x.into(), y.into()), ty)
             }
+            syntax::Expr::Float(s) => {
+                let f32 = self.module.types.intern(Type::F32);
+                let ty = match env {
+                    Some(ty) => match self.module.types.get(ty) {
+                        Type::F32 | Type::F64 => ty,
+                        _ => f32,
+                    },
+                    None => f32,
+                };
+                (ExprKind::Float(*s), ty)
+            }
             syntax::Expr::Integer(s) => {
                 let ty = match env {
                     None => self.module.types.intern(Type::I32),
@@ -251,7 +264,7 @@ impl<'a> FuncBuilder<'a> {
                     }
                 };
                 (ExprKind::Integer(*s), ty)
-            },
+            }
             syntax::Expr::Name(name) => match self.module.names.get(*name) {
                 None => {
                     println!("undefined symbol {:?}", name);
@@ -361,6 +374,8 @@ impl ModuleBuilder {
 pub enum Type {
     I8,
     I32,
+    F32,
+    F64,
     Pointer(TypeId),
     Func(FuncType),
     Struct(StructType),
@@ -433,6 +448,7 @@ pub enum Binop {
 pub enum ExprKind {
     Unit,
     Integer(String),
+    Float(String),
     Param(ParamId),
     Func(FuncId),
     Type(TypeId),

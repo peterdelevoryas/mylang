@@ -87,6 +87,8 @@ unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeR
     match &types[ty] {
         Type::I8 => LLVMInt8Type(),
         Type::I32 => LLVMInt32Type(),
+        Type::F32 => LLVMFloatType(),
+        Type::F64 => LLVMDoubleType(),
         Type::Pointer(ty) => {
             let lltype = build_type(b, types, *ty);
             LLVMPointerType(lltype, 0)
@@ -328,6 +330,10 @@ unsafe fn build_value(
             LLVMGetUndef(LLVMVoidType())
         }
         ExprKind::Type(_) => unimplemented!(),
+        ExprKind::Float(s) => {
+            let lltype = build_type(b, types, expr.ty);
+            LLVMConstRealOfStringAndSize(lltype, s.as_ptr() as *const i8, s.len() as u32)
+        }
         ExprKind::Integer(s) => {
             let lltype = build_type(b, types, expr.ty);
             let i: i64 = match s.parse() {

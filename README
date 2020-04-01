@@ -1,7 +1,6 @@
-fn printf(fmt: *i8, ...) -> i32;
+fn printf(fmt: *i8, ...);
 
 fn main() {
-    let x: i32 = 2 + 2;
-    let n = printf("hello world %d\n", x - 1);
-    printf("num chars printed: %d\n", n);
+    let x: f64 = 2.2;
+    printf("x = %f\n", x);
 }
