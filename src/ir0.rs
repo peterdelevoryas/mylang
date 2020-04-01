@@ -72,7 +72,9 @@ pub fn build(
     let mut b = ModuleBuilder::default();
 
     b.add_type("i8", Type::I8);
+    b.add_type("i16", Type::I16);
     b.add_type("i32", Type::I32);
+    b.add_type("i64", Type::I64);
     b.add_type("f32", Type::F32);
     b.add_type("f64", Type::F64);
 
@@ -373,7 +375,9 @@ impl ModuleBuilder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     I8,
+    I16,
     I32,
+    I64,
     F32,
     F64,
     Pointer(TypeId),

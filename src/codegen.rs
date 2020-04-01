@@ -86,7 +86,9 @@ pub unsafe fn emit_object(
 unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeRef {
     match &types[ty] {
         Type::I8 => LLVMInt8Type(),
+        Type::I16 => LLVMInt16Type(),
         Type::I32 => LLVMInt32Type(),
+        Type::I64 => LLVMInt64Type(),
         Type::F32 => LLVMFloatType(),
         Type::F64 => LLVMDoubleType(),
         Type::Pointer(ty) => {
@@ -390,6 +392,13 @@ unsafe fn build_place(
             let sty = build_type(b, types, x.ty);
             let p = build_place(b, funcs, types, llfuncs, llfunc, locals, x);
             LLVMBuildStructGEP2(b, sty, p, *i, "\0".as_ptr() as *const i8)
+        }
+        ExprKind::Param(i) => {
+            match types[expr.ty] {
+                Type::Struct(_) => {}
+                _ => panic!("trying to evaluate non-struct param as place"),
+            }
+            LLVMGetParam(llfunc, *i as u32)
         }
         k => unimplemented!("{:?}", k),
     }
