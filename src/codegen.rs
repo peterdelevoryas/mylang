@@ -93,6 +93,14 @@ unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeR
         }
         Type::Func(ty) => build_func_type(b, types, ty),
         Type::Unit => LLVMVoidType(),
+        Type::Struct(ty) => {
+            let mut elem_types = vec![];
+            for (_, ty) in &ty.fields {
+                let ty = build_type(b, types, *ty);
+                elem_types.push(ty);
+            }
+            LLVMStructType(elem_types.as_mut_ptr(), elem_types.len() as u32, 0)
+        }
     }
 }
 
@@ -203,6 +211,9 @@ unsafe fn build_value(
     expr: &Expr
 ) -> LLVMValueRef {
     match &expr.kind {
+        ExprKind::Struct(fields) => {
+            unimplemented!()
+        }
         ExprKind::Unit => {
             LLVMGetUndef(LLVMVoidType())
         }

@@ -85,6 +85,7 @@ pub enum Expr {
     Binary(Token, Box<Expr>, Box<Expr>),
     String(String),
     Call(Box<Expr>, Vec<Expr>),
+    Struct(Vec<(String, Expr)>),
 }
 
 pub struct Parser<'a> {
@@ -364,6 +365,24 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            LBRACE => {
+                self.next();
+                let mut fields = vec![];
+                while self.token != RBRACE {
+                    let name = self.token_string();
+                    self.parse(NAME);
+                    self.parse(COLON);
+                    let e = self.parse_expr();
+                    fields.push((name, e));
+
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RBRACE);
+                Expr::Struct(fields)
+            }
             LPARENS => {
                 self.next();
                 self.parse(RPARENS);

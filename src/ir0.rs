@@ -64,11 +64,19 @@ impl NameTable {
     }
 }
 
-pub fn build(func_decls: &[syntax::FuncDecl], func_bodys: &[syntax::FuncBody]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
+pub fn build(
+    struct_types: &[syntax::StructType],
+    func_decls: &[syntax::FuncDecl],
+    func_bodys: &[syntax::FuncBody]
+) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
     let mut b = ModuleBuilder::default();
 
     b.add_type("i8", Type::I8);
     b.add_type("i32", Type::I32);
+
+    for struct_type in struct_types {
+        b.add_struct_type(struct_type);
+    }
 
     for decl in func_decls {
         b.add_func_decl(decl);
@@ -147,6 +155,24 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Struct(fields) => {
+                let ty = match env {
+                    None => panic!(),
+                    Some(ty) => self.module.types.get(ty),
+                };
+                let sty = match ty {
+                    Type::Struct(ty) => ty.clone(),
+                    _ => panic!(),
+                };
+                let mut fields2 = vec![];
+                for (name, e) in fields {
+                    let field_index = sty.field_index(*name);
+                    let field_type = sty.fields[field_index].1;
+                    let e = self.build_expr(e, Some(field_type));
+                    fields2.push((field_index as u32, e));
+                };
+                (ExprKind::Struct(fields2), self.module.types.intern(Type::Struct(sty)))
+            }
             syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::Expr::Call(func, args) => {
                 // Infer function type.
@@ -268,6 +294,17 @@ impl ModuleBuilder {
         self.names.def(name, Def::Type(i));
     }
 
+    fn add_struct_type(&mut self, struct_type: &syntax::StructType) {
+        let mut fields = vec![];
+        for (name, ty) in &struct_type.fields {
+            let ty = self.build_type(ty);
+            fields.push((*name, ty));
+        }
+        let ty = StructType { name: struct_type.name, fields };
+        let ty = self.types.intern(Type::Struct(ty));
+        self.names.def(struct_type.name, Def::Type(ty));
+    }
+
     fn add_func_decl(&mut self, func: &syntax::FuncDecl) {
         let i = self.func_decls.len();
         self.names.def(func.name, Def::Func(i));
@@ -285,7 +322,7 @@ impl ModuleBuilder {
         match ty {
             syntax::Type::Name(name) => match self.names.get(*name) {
                 Some(Def::Type(i)) => i,
-                _ => panic!(),
+                x => panic!("building type: name def = {:?}", x),
             }
             syntax::Type::Pointer(ty) => {
                 let ty = self.build_type(ty);
@@ -316,7 +353,25 @@ pub enum Type {
     I32,
     Pointer(TypeId),
     Func(FuncType),
+    Struct(StructType),
     Unit,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructType {
+    pub name: String,
+    pub fields: Vec<(String, TypeId)>,
+}
+
+impl StructType {
+    fn field_index(&self, field_name: String) -> usize {
+        for (i, &(name, _)) in self.fields.iter().enumerate() {
+            if name == field_name {
+                return i;
+            }
+        }
+        panic!("failed to find field {:?}", field_name);
+    }
 }
 
 pub type TypeId = usize;
@@ -375,4 +430,5 @@ pub enum ExprKind {
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
     Call(Box<Expr>, Vec<Expr>),
+    Struct(Vec<(u32, Expr)>),
 }
