@@ -1,7 +1,7 @@
 use crate::error;
-use crate::String;
 use crate::intern;
 use crate::print_cursor;
+use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -101,7 +101,14 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn next(&mut self) {
-        self.skip_space();
+        loop {
+            let end = self.end;
+            self.skip_space();
+            self.skip_comments();
+            if self.end == end {
+                break;
+            }
+        }
         self.start = self.end;
         let text = self.text[self.end..].as_bytes();
         let (c, d, e) = match text.len() {
@@ -200,6 +207,19 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn skip_comments(&mut self) {
+        if !self.text[self.end..].starts_with("//") {
+            return;
+        }
+        self.end += 2;
+        for b in self.text[self.end..].bytes() {
+            self.end += 1;
+            if b == b'\n' {
+                break;
+            }
+        }
+    }
+
     pub fn parse_struct_type(&mut self) -> StructType {
         self.parse(TYPE);
         let name = self.token_string();
@@ -279,9 +299,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_block(&mut self) -> Block {
-        let stmts = self.parse_list(|p| {
-            p.parse_stmt()
-        }, LBRACE, RBRACE, SEMICOLON);
+        let stmts = self.parse_list(|p| p.parse_stmt(), LBRACE, RBRACE, SEMICOLON);
 
         Block { stmts }
     }
@@ -462,7 +480,7 @@ impl<'a> Parser<'a> {
         mut parse_elem: impl FnMut(&mut Self) -> T,
         start: Token,
         end: Token,
-        separator: Token
+        separator: Token,
     ) -> Vec<T> {
         self.parse(start);
         let mut list = vec![];

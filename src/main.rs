@@ -1,24 +1,26 @@
 #![allow(unused_variables, unused_imports, dead_code)]
 
 use std::env;
-use std::fs;
-use std::process::exit;
 use std::fmt;
+use std::fs;
 use std::ops::Deref;
+use std::process::exit;
 
-mod syntax;
-mod ir0;
 mod codegen;
+mod ir0;
+mod syntax;
 
 fn usage() {
-    println!("\
+    println!(
+        "\
 OVERVIEW: r2 LLVM compiler
 
 USAGE: r2 [options] file...
 
 OPTIONS:
     -h | --help             Display available options.
-");
+"
+    );
 }
 
 fn parse_args() -> std::string::String {
@@ -98,7 +100,11 @@ fn print_cursor(text: &str, start: usize, end: usize) {
     println!("{}", &text[line_start..line_end]);
 
     for b in text[line_start..start].bytes() {
-        let c = if b.is_ascii_whitespace() { b as char } else { ' ' };
+        let c = if b.is_ascii_whitespace() {
+            b as char
+        } else {
+            ' '
+        };
         print!("{}", c);
     }
     for _ in start..end {
@@ -142,10 +148,7 @@ fn main() {
         }
 
         let body = p.parse_block();
-        let body = syntax::FuncBody {
-            id: id,
-            body: body,
-        };
+        let body = syntax::FuncBody { id: id, body: body };
         func_bodys.push(body);
     }
     println!("{:?}", struct_types);

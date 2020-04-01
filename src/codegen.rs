@@ -1,16 +1,12 @@
-use crate::ir0::*;
 use crate::error;
+use crate::ir0::*;
 use llvm_sys::*;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
-use std::ptr;
 use std::ops::Deref;
+use std::ptr;
 
-pub unsafe fn emit_object(
-    func_decls: &[FuncDecl], 
-    func_bodys: &[FuncBody],
-    types: &[Type]
-) {
+pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], types: &[Type]) {
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
@@ -222,7 +218,7 @@ unsafe fn emit_call(
     locals: &[LLVMValueRef],
     func: &Expr,
     args: &[Expr],
-    sret: Option<LLVMValueRef>
+    sret: Option<LLVMValueRef>,
 ) -> LLVMValueRef {
     let fnty = match &types[func.ty] {
         Type::Func(fnty) => build_func_type(b, types, fnty),
@@ -259,7 +255,7 @@ unsafe fn build_value_into(
     llfunc: LLVMValueRef,
     locals: &[LLVMValueRef],
     e: &Expr,
-    dst: LLVMValueRef
+    dst: LLVMValueRef,
 ) {
     match &types[e.ty] {
         Type::Unit => {
@@ -269,12 +265,23 @@ unsafe fn build_value_into(
             ExprKind::Struct(fields) => {
                 let llsty = build_type(b, types, e.ty);
                 for (i, e) in fields {
-                    let dst = LLVMBuildStructGEP2(b, llsty, dst, *i as u32, "\0".as_ptr() as *const i8);
+                    let dst =
+                        LLVMBuildStructGEP2(b, llsty, dst, *i as u32, "\0".as_ptr() as *const i8);
                     build_value_into(b, funcs, types, llfuncs, llfunc, locals, e, dst);
                 }
             }
             ExprKind::Call(func, args) => {
-                let _ = emit_call(b, funcs, types, llfuncs, llfunc, locals, func, args, Some(dst));
+                let _ = emit_call(
+                    b,
+                    funcs,
+                    types,
+                    llfuncs,
+                    llfunc,
+                    locals,
+                    func,
+                    args,
+                    Some(dst),
+                );
             }
             ExprKind::Param(i) => {
                 let src = LLVMGetParam(llfunc, *i as u32);
@@ -292,7 +299,13 @@ unsafe fn build_value_into(
     }
 }
 
-unsafe fn copy(b: LLVMBuilderRef, types: &[Type], ty: TypeId, src: LLVMValueRef, dst: LLVMValueRef) {
+unsafe fn copy(
+    b: LLVMBuilderRef,
+    types: &[Type],
+    ty: TypeId,
+    src: LLVMValueRef,
+    dst: LLVMValueRef,
+) {
     match &types[ty] {
         Type::Struct(sty) => {
             let llsty = build_type(b, types, ty);
@@ -319,7 +332,7 @@ unsafe fn build_value(
     llfuncs: &[LLVMValueRef],
     llfunc: LLVMValueRef,
     locals: &[LLVMValueRef],
-    expr: &Expr
+    expr: &Expr,
 ) -> LLVMValueRef {
     match &expr.kind {
         ExprKind::Field(_, _) => {
@@ -328,9 +341,7 @@ unsafe fn build_value(
             LLVMBuildLoad2(b, field_type, p, "\0".as_ptr() as *const i8)
         }
         ExprKind::Struct(fields) => panic!(),
-        ExprKind::Unit => {
-            LLVMGetUndef(LLVMVoidType())
-        }
+        ExprKind::Unit => LLVMGetUndef(LLVMVoidType()),
         ExprKind::Type(_) => unimplemented!(),
         ExprKind::Float(s) => {
             let lltype = build_type(b, types, expr.ty);
@@ -372,9 +383,7 @@ unsafe fn build_value(
         }
         ExprKind::MethodCall(_, _) => unimplemented!(),
         ExprKind::Func(i) => llfuncs[*i],
-        ExprKind::Param(i) => {
-            LLVMGetParam(llfunc, *i as u32)
-        }
+        ExprKind::Param(i) => LLVMGetParam(llfunc, *i as u32),
     }
 }
 
@@ -385,7 +394,7 @@ unsafe fn build_place(
     llfuncs: &[LLVMValueRef],
     llfunc: LLVMValueRef,
     locals: &[LLVMValueRef],
-    expr: &Expr
+    expr: &Expr,
 ) -> LLVMValueRef {
     match &expr.kind {
         ExprKind::Local(i) => locals[*i],
@@ -415,7 +424,7 @@ fn unescape(s: &str) -> String {
         let c = match c {
             '\\' if !escaped => {
                 backslash = true;
-                continue
+                continue;
             }
             'n' if escaped => '\n',
             't' if escaped => '\t',

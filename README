@@ -1,18 +1,7 @@
 fn printf(fmt: *i8, ...);
-fn strlen(s: *i8) -> i64;
-
-type string struct {
-    ptr: *i8,
-}
-
-fn len(s: string) -> i64 {
-    return strlen(s.ptr);
-}
 
 fn main() {
-    let s: string = {
-        ptr: "hello world",
-    };
-    printf("len(%s) = %lld\n", s.ptr, len(s));
-    printf("len(%s) = %lld\n", s.ptr, s.len());
+    let x: i32 = 2;
+    let x: i32 = 3;
+    printf("%d\n", x);
 }

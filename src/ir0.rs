@@ -1,8 +1,8 @@
 use crate::error;
-use crate::String;
 use crate::intern;
 use crate::print_cursor;
 use crate::syntax;
+use crate::String;
 
 #[derive(Debug, Default)]
 pub struct TypeIntern {
@@ -13,7 +13,7 @@ impl TypeIntern {
     fn intern(&mut self, ty: Type) -> TypeId {
         for (i, interned) in self.types.iter().enumerate() {
             if ty == *interned {
-                return i
+                return i;
             }
         }
         let i = self.types.len();
@@ -45,7 +45,7 @@ impl NameTable {
     }
 
     fn get(&self, name: String) -> Option<Def> {
-        for &(other, def) in &self.names {
+        for &(other, def) in self.names.iter().rev() {
             if other == name {
                 return Some(def);
             }
@@ -67,7 +67,7 @@ impl NameTable {
 pub fn build(
     struct_types: &[syntax::StructType],
     func_decls: &[syntax::FuncDecl],
-    func_bodys: &[syntax::FuncBody]
+    func_bodys: &[syntax::FuncBody],
 ) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
     let mut b = ModuleBuilder::default();
 
@@ -209,8 +209,11 @@ impl<'a> FuncBuilder<'a> {
                     let field_type = sty.fields[field_index].1;
                     let e = self.build_expr(e, Some(field_type));
                     fields2.push((field_index as u32, e));
-                };
-                (ExprKind::Struct(fields2), self.module.types.intern(Type::Struct(sty)))
+                }
+                (
+                    ExprKind::Struct(fields2),
+                    self.module.types.intern(Type::Struct(sty)),
+                )
             }
             syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::Expr::Call(func, args) => {
@@ -245,14 +248,20 @@ impl<'a> FuncBuilder<'a> {
                 // Verify number of call args count.
                 if fnty.var_args {
                     if args.len() < params.len() {
-                        println!("var args function requires {} params, got {}",
-                            params.len(), args.len());
+                        println!(
+                            "var args function requires {} params, got {}",
+                            params.len(),
+                            args.len()
+                        );
                         error();
                     }
                 } else {
                     if args.len() != params.len() {
-                        println!("function has {} params, but {} args were supplied",
-                            params.len(), args.len());
+                        println!(
+                            "function has {} params, but {} args were supplied",
+                            params.len(),
+                            args.len()
+                        );
                         error();
                     }
                 }
@@ -301,9 +310,9 @@ impl<'a> FuncBuilder<'a> {
                 let ty = match env {
                     None => self.module.types.intern(Type::I32),
                     Some(ty) => match self.module.types.get(ty) {
-                        Type::I8 | Type::I32 => ty,
+                        Type::I8 | Type::I16 | Type::I32 | Type::I64 => ty,
                         _ => self.module.types.intern(Type::I32),
-                    }
+                    },
                 };
                 (ExprKind::Integer(*s), ty)
             }
@@ -321,20 +330,19 @@ impl<'a> FuncBuilder<'a> {
                         });
                         (ExprKind::Func(i), ty)
                     }
-                    Def::Local(i) => {
-                        (ExprKind::Local(i), self.body.locals[i])
-                    }
+                    Def::Local(i) => (ExprKind::Local(i), self.body.locals[i]),
                     Def::Param(i) => {
                         let ty = self.module.func_decls[self.body.id].ty.params[i];
                         (ExprKind::Param(i), ty)
                     }
                     _ => unimplemented!(),
                 },
-            }
+            },
         };
         if let Some(env) = env {
             if ty != env {
-                println!("expected {:?}, got {:?}",
+                println!(
+                    "expected {:?}, got {:?}",
                     self.module.types.get(env),
                     self.module.types.get(ty)
                 );
@@ -365,7 +373,10 @@ impl ModuleBuilder {
             let ty = self.build_type(ty);
             fields.push((*name, ty));
         }
-        let ty = StructType { name: struct_type.name, fields };
+        let ty = StructType {
+            name: struct_type.name,
+            fields,
+        };
         let ty = self.types.intern(Type::Struct(ty));
         self.names.def(struct_type.name, Def::Type(ty));
     }
@@ -388,14 +399,12 @@ impl ModuleBuilder {
             syntax::Type::Name(name) => match self.names.get(*name) {
                 Some(Def::Type(i)) => i,
                 x => panic!("building type: name def = {:?}", x),
-            }
+            },
             syntax::Type::Pointer(ty) => {
                 let ty = self.build_type(ty);
                 self.types.intern(Type::Pointer(ty))
             }
-            syntax::Type::Func(ty) => {
-                unimplemented!()
-            }
+            syntax::Type::Func(ty) => unimplemented!(),
             syntax::Type::Unit => self.types.intern(Type::Unit),
         }
     }
@@ -408,7 +417,11 @@ impl ModuleBuilder {
         }
         let ret = self.build_type(&ty.ret);
         let var_args = ty.var_args;
-        FuncType { params, ret, var_args }
+        FuncType {
+            params,
+            ret,
+            var_args,
+        }
     }
 }
 
