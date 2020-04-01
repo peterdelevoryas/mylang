@@ -102,7 +102,8 @@ unsafe fn build_func_type(b: LLVMBuilderRef, types: &[Type], ty: &FuncType) -> L
         params.push(lltype);
     }
     let ret = build_type(b, types, ty.ret);
-    LLVMFunctionType(ret, params.as_mut_ptr(), params.len() as u32, 0)
+    let var_args = if ty.var_args { 1 } else { 0 };
+    LLVMFunctionType(ret, params.as_mut_ptr(), params.len() as u32, var_args)
 }
 
 unsafe fn build_func_body(

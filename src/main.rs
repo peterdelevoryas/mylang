@@ -123,14 +123,28 @@ fn main() {
         token: syntax::EOF,
     };
     p.next();
-    let mut funcs = Vec::new();
+    let mut func_decls = vec![];
+    let mut func_bodys = vec![];
     while p.token != syntax::EOF {
-        let func = p.parse_func();
-        funcs.push(func);
-    }
-    println!("{:?}", funcs);
+        let decl = p.parse_func_decl();
+        let id = func_decls.len();
+        func_decls.push(decl);
+        if p.token == syntax::SEMICOLON {
+            p.next();
+            continue;
+        }
 
-    let (func_decls, func_bodys, types) = ir0::build(&funcs);
+        let body = p.parse_block();
+        let body = syntax::FuncBody {
+            id: id,
+            body: body,
+        };
+        func_bodys.push(body);
+    }
+    println!("{:?}", func_decls);
+    println!("{:?}", func_bodys);
+
+    let (func_decls, func_bodys, types) = ir0::build(&func_decls, &func_bodys);
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
     println!("{:?}", types);

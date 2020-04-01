@@ -64,20 +64,20 @@ impl NameTable {
     }
 }
 
-pub fn build(funcs: &[syntax::Func]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
+pub fn build(func_decls: &[syntax::FuncDecl], func_bodys: &[syntax::FuncBody]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
     let mut b = ModuleBuilder::default();
 
     b.add_type("i8", Type::I8);
     b.add_type("i32", Type::I32);
 
-    for func in funcs {
-        b.add_func_decl(func);
+    for decl in func_decls {
+        b.add_func_decl(decl);
     }
 
-    let mut func_bodys = vec![];
-    for (id, func) in funcs.iter().enumerate() {
+    let mut bodys = vec![];
+    for func in func_bodys {
         let body = FuncBody {
-            id: id,
+            id: func.id,
             locals: vec![],
             stmts: vec![],
         };
@@ -86,10 +86,10 @@ pub fn build(funcs: &[syntax::Func]) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>
             body: body,
         };
         let body = b.build_body(&func.body);
-        func_bodys.push(body);
+        bodys.push(body);
     }
 
-    (b.func_decls, func_bodys, b.types.types)
+    (b.func_decls, bodys, b.types.types)
 }
 
 struct FuncBuilder<'a> {
@@ -217,7 +217,7 @@ impl ModuleBuilder {
         self.names.def(name, Def::Type(i));
     }
 
-    fn add_func_decl(&mut self, func: &syntax::Func) {
+    fn add_func_decl(&mut self, func: &syntax::FuncDecl) {
         let i = self.func_decls.len();
         self.names.def(func.name, Def::Func(i));
 
@@ -253,7 +253,8 @@ impl ModuleBuilder {
             params.push(ty);
         }
         let ret = self.build_type(&ty.ret);
-        FuncType { params, ret }
+        let var_args = ty.var_args;
+        FuncType { params, ret, var_args }
     }
 }
 
@@ -274,6 +275,7 @@ pub type LocalId = usize;
 pub struct FuncType {
     pub params: Vec<TypeId>,
     pub ret: TypeId,
+    pub var_args: bool,
 }
 
 #[derive(Debug)]

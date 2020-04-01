@@ -23,6 +23,7 @@ pub enum Token {
     STRING,
     PLUS,
     MINUS,
+    ELLIPSIS,
     EOF,
 }
 pub use Token::*;
@@ -38,13 +39,20 @@ pub enum Type {
 pub struct FuncType {
     pub params: Vec<Type>,
     pub ret: Type,
+    pub var_args: bool,
 }
 
 #[derive(Debug)]
-pub struct Func {
+pub struct FuncDecl {
     pub name: String,
     pub params: Vec<String>,
     pub ty: FuncType,
+}
+
+#[derive(Debug)]
+pub struct FuncBody {
+    // FIXME use something else to associate with FuncDecl?
+    pub id: usize,
     pub body: Block,
 }
 
@@ -78,14 +86,15 @@ impl<'a> Parser<'a> {
     pub fn next(&mut self) {
         self.skip_space();
         self.start = self.end;
-        let remaining = self.text[self.end..].as_bytes();
-        let (c, d) = match remaining.len() {
+        let text = self.text[self.end..].as_bytes();
+        let (c, d, e) = match text.len() {
             0 => {
                 self.token = EOF;
                 return;
             }
-            1 => (remaining[0] as char, '\0'),
-            _ => (remaining[0] as char, remaining[1] as char),
+            1 => (text[0] as char, '\0', '\0'),
+            2 => (text[0] as char, text[1] as char, '\0'),
+            _ => (text[0] as char, text[1] as char, text[2] as char),
         };
 
         let (token, n) = match c {
@@ -101,17 +110,18 @@ impl<'a> Parser<'a> {
             ';' => (SEMICOLON, 1),
             '*' => (STAR, 1),
             ':' => (COLON, 1),
+            '.' if d == '.' && e == '.' => (ELLIPSIS, 3),
             '"' => {
                 let mut escaped = false;
                 let mut n = 1;
-                for b in &remaining[1..] {
+                for b in &text[1..] {
                     if !escaped && *b == b'"' {
                         break;
                     }
                     escaped = !escaped && *b == b'\\';
                     n += 1;
                 }
-                if remaining.get(n) != Some(&b'"') {
+                if text.get(n) != Some(&b'"') {
                     print_cursor(self.text, self.start, self.start + 1);
                     println!("unterminated string literal");
                     error();
@@ -121,13 +131,13 @@ impl<'a> Parser<'a> {
             }
             _ if c.is_ascii_alphabetic() || c == '_' => {
                 let mut n = 0;
-                for c in remaining {
+                for c in text {
                     if !c.is_ascii_alphanumeric() && *c != b'_' {
                         break;
                     }
                     n += 1;
                 }
-                let token = match &remaining[..n] {
+                let token = match &text[..n] {
                     b"fn" => FN,
                     b"let" => LET,
                     b"return" => RETURN,
@@ -137,7 +147,7 @@ impl<'a> Parser<'a> {
             }
             _ if c.is_ascii_digit() => {
                 let mut n = 0;
-                for c in remaining {
+                for c in text {
                     if !c.is_ascii_digit() {
                         break;
                     }
@@ -164,40 +174,53 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_func(&mut self) -> Func {
+    pub fn parse_func_decl(&mut self) -> FuncDecl {
         self.parse(FN);
 
         let name = self.token_string();
         self.parse(NAME);
 
+        let mut var_args = false;
         let mut params = vec![];
-        let param_types = self.parse_list(|p| {
-            let name = p.token_string();
-            p.parse(NAME);
-            p.parse(COLON);
-            let ty = p.parse_type();
+        let mut param_types = vec![];
+        self.parse(LPARENS);
+        while self.token != RPARENS {
+            if self.token == ELLIPSIS {
+                self.next();
+                var_args = true;
+                break;
+            }
+
+            let name = self.token_string();
+            self.parse(NAME);
+            self.parse(COLON);
+            let ty = self.parse_type();
             params.push(name);
-            ty
-        }, LPARENS, RPARENS, COMMA);
+            param_types.push(ty);
+
+            if self.token != COMMA {
+                break;
+            }
+            self.next();
+        }
+        self.parse(RPARENS);
 
         self.parse(ARROW);
         let ret = self.parse_type();
         let ty = FuncType {
             params: param_types,
             ret: ret.into(),
+            var_args: var_args,
         };
 
-        let body = self.parse_block();
-
-        Func {
+        FuncDecl {
             name: name,
             params: params,
             ty: ty,
-            body: body,
         }
     }
 
-    fn parse_block(&mut self) -> Block {
+    pub fn parse_block(&mut self) -> Block {
         let stmts = self.parse_list(|p| {
             p.parse_stmt()
         }, LBRACE, RBRACE, SEMICOLON);
