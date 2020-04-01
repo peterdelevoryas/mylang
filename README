@@ -1,7 +1,8 @@
 fn printf(fmt: *i8, ...);
 
+// This is an example R2 program.
+// To see examples of all language features, check the filetests directory.
+
 fn main() {
-    let x: i32 = 2;
-    let x: i32 = 3;
-    printf("%d\n", x);
+    printf("hello world\n");
 }
