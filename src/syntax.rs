@@ -261,7 +261,10 @@ impl<'a> Parser<'a> {
             }
             RETURN => {
                 self.next();
-                let e = self.parse_expr();
+                let e = match self.token {
+                    SEMICOLON => Expr::Unit,
+                    _ => self.parse_expr(),
+                };
                 Stmt::Return(e)
             }
             _ => {
