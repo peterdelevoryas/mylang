@@ -107,7 +107,10 @@ unsafe fn build_type(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMTypeR
 unsafe fn build_func_type(b: LLVMBuilderRef, types: &[Type], ty: &FuncType) -> LLVMTypeRef {
     let mut params = vec![];
     for ty in &ty.params {
-        let lltype = build_type(b, types, *ty);
+        let mut lltype = build_type(b, types, *ty);
+        if let Type::Struct(_) = types[*ty] {
+            lltype = LLVMPointerType(lltype, 0);
+        }
         params.push(lltype);
     }
     let mut ret = build_type(b, types, ty.ret);
@@ -201,6 +204,44 @@ unsafe fn build_alloca(b: LLVMBuilderRef, types: &[Type], ty: TypeId) -> LLVMVal
     }
 }
 
+unsafe fn emit_call(
+    b: LLVMBuilderRef,
+    funcs: &[FuncDecl],
+    types: &[Type],
+    llfuncs: &[LLVMValueRef],
+    llfunc: LLVMValueRef,
+    locals: &[LLVMValueRef],
+    func: &Expr,
+    args: &[Expr],
+    sret: Option<LLVMValueRef>
+) -> LLVMValueRef {
+    let fnty = match &types[func.ty] {
+        Type::Func(fnty) => build_func_type(b, types, fnty),
+        _ => panic!(),
+    };
+    let func = build_value(b, funcs, types, llfuncs, llfunc, locals, func);
+    let mut args2 = vec![];
+    for arg in args {
+        match &types[arg.ty] {
+            Type::Struct(sty) => {
+                let tmp = build_alloca(b, types, arg.ty);
+                build_value_into(b, funcs, types, llfuncs, llfunc, locals, arg, tmp);
+                args2.push(tmp);
+            }
+            _ => {
+                let v = build_value(b, funcs, types, llfuncs, llfunc, locals, arg);
+                args2.push(v);
+            }
+        }
+    }
+    if let Some(sret) = sret {
+        args2.push(sret);
+    }
+    let mut args = args2;
+    let name = "\0".as_ptr() as *const i8;
+    LLVMBuildCall2(b, fnty, func, args.as_mut_ptr(), args.len() as u32, name)
+}
+
 unsafe fn build_value_into(
     b: LLVMBuilderRef,
     funcs: &[FuncDecl],
@@ -224,18 +265,11 @@ unsafe fn build_value_into(
                 }
             }
             ExprKind::Call(func, args) => {
-                let fnty = match &types[func.ty] {
-                    Type::Func(fnty) => build_func_type(b, types, fnty),
-                    _ => panic!(),
-                };
-                let func = build_value(b, funcs, types, llfuncs, llfunc, locals, func);
-                let mut args2 = vec![];
-                for arg in args {
-                    let arg = build_value(b, funcs, types, llfuncs, llfunc, locals, arg);
-                    args2.push(arg);
-                }
-                args2.push(dst);
-                LLVMBuildCall2(b, fnty, func, args2.as_mut_ptr(), args2.len() as u32, "\0".as_ptr() as *const i8);
+                let _ = emit_call(b, funcs, types, llfuncs, llfunc, locals, func, args, Some(dst));
+            }
+            ExprKind::Param(i) => {
+                let src = LLVMGetParam(llfunc, *i as u32);
+                copy(b, types, e.ty, src, dst);
             }
             _ => {
                 let src = build_place(b, funcs, types, llfuncs, llfunc, locals, e);
@@ -321,19 +355,7 @@ unsafe fn build_value(
             LLVMBuildGlobalStringPtr(b, s, name)
         }
         ExprKind::Call(func, args) => {
-            let fnty = match &types[func.ty] {
-                Type::Func(fnty) => build_func_type(b, types, fnty),
-                _ => panic!(),
-            };
-            let func = build_value(b, funcs, types, llfuncs, llfunc, locals, func);
-            let mut args2 = vec![];
-            for arg in args {
-                let arg = build_value(b, funcs, types, llfuncs, llfunc, locals, arg);
-                args2.push(arg);
-            }
-            let mut args = args2;
-            let name = "\0".as_ptr() as *const i8;
-            LLVMBuildCall2(b, fnty, func, args.as_mut_ptr(), args.len() as u32, name)
+            emit_call(b, funcs, types, llfuncs, llfunc, locals, func, args, None)
         }
         ExprKind::Func(i) => llfuncs[*i],
         ExprKind::Param(i) => {
