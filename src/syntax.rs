@@ -24,6 +24,8 @@ pub enum Token {
     PLUS,
     MINUS,
     ELLIPSIS,
+    TYPE,
+    STRUCT,
     EOF,
 }
 pub use Token::*;
@@ -34,6 +36,12 @@ pub enum Type {
     Name(String),
     Pointer(Box<Type>),
     Func(Box<FuncType>),
+}
+
+#[derive(Debug, Clone)]
+pub struct StructType {
+    pub name: String,
+    pub fields: Vec<(String, Type)>,
 }
 
 #[derive(Debug, Clone)]
@@ -141,10 +149,13 @@ impl<'a> Parser<'a> {
                     }
                     n += 1;
                 }
+                // keywords
                 let token = match &text[..n] {
                     b"fn" => FN,
                     b"let" => LET,
                     b"return" => RETURN,
+                    b"type" => TYPE,
+                    b"struct" => STRUCT,
                     _ => NAME,
                 };
                 (token, n)
@@ -175,6 +186,32 @@ impl<'a> Parser<'a> {
                 break;
             }
             self.end += 1;
+        }
+    }
+
+    pub fn parse_struct_type(&mut self) -> StructType {
+        self.parse(TYPE);
+        let name = self.token_string();
+        self.parse(NAME);
+        self.parse(STRUCT);
+        self.parse(LBRACE);
+        let mut fields = vec![];
+        while self.token != RBRACE {
+            let name = self.token_string();
+            self.parse(NAME);
+            self.parse(COLON);
+            let ty = self.parse_type();
+            fields.push((name, ty));
+            if self.token != COMMA {
+                break;
+            }
+            self.next();
+        }
+        self.parse(RBRACE);
+
+        StructType {
+            name: name,
+            fields: fields,
         }
     }
 

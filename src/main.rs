@@ -123,9 +123,16 @@ fn main() {
         token: syntax::EOF,
     };
     p.next();
+    let mut struct_types = vec![];
     let mut func_decls = vec![];
     let mut func_bodys = vec![];
     while p.token != syntax::EOF {
+        if p.token == syntax::TYPE {
+            let struct_type = p.parse_struct_type();
+            struct_types.push(struct_type);
+            continue;
+        }
+
         let decl = p.parse_func_decl();
         let id = func_decls.len();
         func_decls.push(decl);
@@ -141,6 +148,7 @@ fn main() {
         };
         func_bodys.push(body);
     }
+    println!("{:?}", struct_types);
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
 

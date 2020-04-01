@@ -1,6 +1,9 @@
-fn printf(fmt: *i8, ...);
+type person struct {
+    name: *i8,
+    gender: *i8,
+    age: i32,
+}
 
-fn main() {
-    printf("hello world\n");
-    return;
+fn main(argc: i32, argv: **i8) -> i32 {
+    return 0;
 }
