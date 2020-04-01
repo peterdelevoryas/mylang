@@ -188,6 +188,13 @@ unsafe fn build_value(
                 Binop::Sub => LLVMBuildSub(b, x, y, name),
             }
         }
+        ExprKind::String(s) => {
+            let mut s = unescape(s);
+            s.push('\0');
+            let s = s.as_ptr() as *const i8;
+            let name = "\0".as_ptr() as *const i8;
+            LLVMBuildGlobalStringPtr(b, s, name)
+        }
         x => unimplemented!("{:?}", x),
     }
 }
@@ -205,4 +212,26 @@ unsafe fn build_place(
         ExprKind::Local(i) => locals[*i],
         k => unimplemented!("{:?}", k),
     }
+}
+
+fn unescape(s: &str) -> String {
+    let s = &s[1..s.len() - 1];
+    let mut x = String::with_capacity(s.len());
+    let mut backslash = false;
+    for c in s.chars() {
+        let escaped = backslash;
+        backslash = false;
+        let c = match c {
+            '\\' if !escaped => {
+                backslash = true;
+                continue
+            }
+            'n' if escaped => '\n',
+            't' if escaped => '\t',
+            '\\' if escaped => '\\',
+            _ => c,
+        };
+        x.push(c);
+    }
+    x
 }

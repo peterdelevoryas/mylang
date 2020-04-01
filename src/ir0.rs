@@ -143,12 +143,17 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::String(s) => {
+                let i8 = self.module.types.intern(Type::I8);
+                let ptr_i8 = self.module.types.intern(Type::Pointer(i8));
+                (ExprKind::String(*s), ptr_i8)
+            }
             syntax::Expr::Binary(op, x, y) => {
                 let x = self.build_expr(x, None);
                 let y = self.build_expr(y, Some(x.ty));
                 let op = match op {
-                    PLUS => Binop::Add,
-                    MINUS => Binop::Sub,
+                    syntax::PLUS => Binop::Add,
+                    syntax::MINUS => Binop::Sub,
                     _ => panic!(),
                 };
                 let ty = x.ty;
@@ -311,4 +316,5 @@ pub enum ExprKind {
     Type(TypeId),
     Local(LocalId),
     Binary(Binop, Box<Expr>, Box<Expr>),
+    String(String),
 }

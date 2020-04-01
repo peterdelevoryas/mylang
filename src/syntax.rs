@@ -20,6 +20,7 @@ pub enum Token {
     RETURN,
     NAME,
     INTEGER,
+    STRING,
     PLUS,
     MINUS,
     EOF,
@@ -63,6 +64,7 @@ pub enum Expr {
     Integer(String),
     Name(String),
     Binary(Token, Box<Expr>, Box<Expr>),
+    String(String),
 }
 
 pub struct Parser<'a> {
@@ -99,6 +101,24 @@ impl<'a> Parser<'a> {
             ';' => (SEMICOLON, 1),
             '*' => (STAR, 1),
             ':' => (COLON, 1),
+            '"' => {
+                let mut escaped = false;
+                let mut n = 1;
+                for b in &remaining[1..] {
+                    if !escaped && *b == b'"' {
+                        break;
+                    }
+                    escaped = !escaped && *b == b'\\';
+                    n += 1;
+                }
+                if remaining.get(n) != Some(&b'"') {
+                    print_cursor(self.text, self.start, self.start + 1);
+                    println!("unterminated string literal");
+                    error();
+                }
+                n += 1;
+                (STRING, n)
+            }
             _ if c.is_ascii_alphabetic() || c == '_' => {
                 let mut n = 0;
                 for c in remaining {
@@ -250,6 +270,11 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            STRING => {
+                let s = self.token_string();
+                self.next();
+                Expr::String(s)
+            }
             INTEGER => {
                 let s = self.token_string();
                 self.next();
