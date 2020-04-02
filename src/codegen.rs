@@ -400,6 +400,10 @@ impl<'a> StmtBuilder<'a> {
                 let param = LLVMGetParam(self.llfunc, i);
                 self.copy(e.ty, param, dst);
             }
+            ExprKind::Unary(Unop::Deref, p) => {
+                let p = self.build_scalar(p);
+                self.copy(e.ty, p, dst);
+            }
             _ => {
                 let p = self.build_place(e);
                 self.copy(e.ty, p, dst);
@@ -539,6 +543,14 @@ impl<'a> StmtBuilder<'a> {
             }
             ExprKind::Bool(true) => LLVMConstInt(LLVMInt1Type(), 1, 0),
             ExprKind::Bool(false) => LLVMConstInt(LLVMInt1Type(), 0, 0),
+            ExprKind::Unary(Unop::AddressOf, e) => {
+                self.build_place(e)
+            }
+            ExprKind::Unary(Unop::Deref, p) => {
+                let lltype = self.tybld.lltype(e.ty);
+                let p = self.build_scalar(p);
+                LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
+            }
             _ => panic!("expected scalar, got {:?}", e),
         }
     }

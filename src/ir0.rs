@@ -192,6 +192,33 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Unary(op, e) => match op {
+                syntax::AMPERSAND => {
+                    let env = match env {
+                        Some(ty) => match self.module.types.get(ty) {
+                            Type::Pointer(ty) => Some(*ty),
+                            _ => panic!("address-of expression should have pointer type"),
+                        }
+                        None => None,
+                    };
+                    let e = self.build_expr(e, env);
+                    let ty = self.module.types.intern(Type::Pointer(e.ty));
+                    (ExprKind::Unary(Unop::AddressOf, e.into()), ty)
+                }
+                syntax::STAR => {
+                    let env = match env {
+                        Some(ty) => Some(self.module.types.intern(Type::Pointer(ty))),
+                        None => None,
+                    };
+                    let e = self.build_expr(e, env);
+                    let ty = match self.module.types.get(e.ty) {
+                        Type::Pointer(ty) => *ty,
+                        _ => panic!("expected pointer type in deref"),
+                    };
+                    (ExprKind::Unary(Unop::Deref, e.into()), ty)
+                }
+                op => unimplemented!("unary operator {:?}", op),
+            }
             syntax::Expr::Bool(b) => {
                 let bool = self.module.types.intern(Type::Bool);
                 (ExprKind::Bool(*b), bool)
@@ -568,6 +595,12 @@ pub enum Predicate {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum Unop {
+    AddressOf,
+    Deref,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Binop {
     Add,
     Sub,
@@ -584,6 +617,7 @@ pub enum ExprKind {
     Param(ParamId),
     Func(FuncId),
     Local(LocalId),
+    Unary(Unop, Box<Expr>),
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
     Call(Box<Expr>, Vec<Expr>),

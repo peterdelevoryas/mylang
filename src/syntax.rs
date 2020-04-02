@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    AMPERSAND,
     FOR,
     WHILE,
     EQ,
@@ -102,6 +103,7 @@ pub enum Expr {
     Integer(String),
     Float(String),
     Name(String),
+    Unary(Token, Box<Expr>),
     Binary(Token, Box<Expr>, Box<Expr>),
     String(String),
     Call(Box<Expr>, Vec<Expr>),
@@ -143,6 +145,7 @@ impl<'a> Parser<'a> {
         let (token, n) = match c {
             '-' if d == '>' => (ARROW, 2),
             '-' => (MINUS, 1),
+            '&' => (AMPERSAND, 1),
             '+' => (PLUS, 1),
             '(' => (LPARENS, 1),
             ')' => (RPARENS, 1),
@@ -443,13 +446,25 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_as(&mut self) -> Expr {
-        let mut x = self.parse_call();
+        let mut x = self.parse_unary();
         while self.token == AS {
             self.next();
             let ty = self.parse_type();
             x = Expr::Cast(x.into(), ty);
         }
         x
+    }
+
+    fn parse_unary(&mut self) -> Expr {
+        match self.token {
+            STAR | AMPERSAND => {
+                let op = self.token;
+                self.next();
+                let e = self.parse_unary();
+                Expr::Unary(op, e.into())
+            }
+            _ => self.parse_call(),
+        }
     }
 
     fn parse_field(&mut self) -> Expr {
