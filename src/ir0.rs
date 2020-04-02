@@ -306,16 +306,25 @@ impl<'a> FuncBuilder<'a> {
                 (ExprKind::String(*s), ptr_i8)
             }
             syntax::Expr::Binary(op, x, y) => {
-                let x = self.build_expr(x, None);
-                let y = self.build_expr(y, Some(x.ty));
                 let op = match op {
                     syntax::PLUS => Binop::Add,
                     syntax::MINUS => Binop::Sub,
                     syntax::STAR => Binop::Mul,
                     syntax::SLASH => Binop::Div,
+                    syntax::LT => Binop::Cmp(Predicate::Lt),
+                    syntax::GT => Binop::Cmp(Predicate::Gt),
+                    syntax::LE => Binop::Cmp(Predicate::Le),
+                    syntax::GE => Binop::Cmp(Predicate::Ge),
+                    syntax::EQ => Binop::Cmp(Predicate::Eq),
+                    syntax::NE => Binop::Cmp(Predicate::Ne),
                     _ => panic!(),
                 };
-                let ty = x.ty;
+                let x = self.build_expr(x, None);
+                let y = self.build_expr(y, Some(x.ty));
+                let ty = match op {
+                    Binop::Cmp(_) => self.module.types.intern(Type::Bool),
+                    _ => x.ty,
+                };
                 (ExprKind::Binary(op, x.into(), y.into()), ty)
             }
             syntax::Expr::Float(s) => {
@@ -526,11 +535,22 @@ pub struct Expr {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum Predicate {
+    Eq,
+    Ne,
+    Le,
+    Ge,
+    Lt,
+    Gt,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Binop {
     Add,
     Sub,
     Mul,
     Div,
+    Cmp(Predicate),
 }
 
 #[derive(Debug)]

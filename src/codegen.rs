@@ -421,36 +421,46 @@ impl<'a> StmtBuilder<'a> {
                 self.llfuncs[*i]
             }
             ExprKind::Binary(op, x, y) => {
-                let irty = self.tybld.irtype(e.ty);
-                let add = match irty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildAdd,
-                    Type::F32 | Type::F64 => LLVMBuildFAdd,
-                    _ => unreachable!(),
-                };
-                let sub = match irty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildSub,
-                    Type::F32 | Type::F64 => LLVMBuildFSub,
-                    _ => unreachable!(),
-                };
-                let mul = match irty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildMul,
-                    Type::F32 | Type::F64 => LLVMBuildFMul,
-                    _ => unreachable!(),
-                };
-                let div = match irty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildMul,
-                    Type::F32 | Type::F64 => LLVMBuildFMul,
-                    _ => unreachable!(),
+                let irty = self.tybld.irtype(x.ty);
+                let float = match irty {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => false,
+                    Type::F32 | Type::F64 => true,
+                    x => panic!("unexpected type {:?}", x),
                 };
                 let x = self.build_scalar(x);
                 let y = self.build_scalar(y);
-                let inst = match op {
-                    Binop::Add => add,
-                    Binop::Sub => sub,
-                    Binop::Mul => mul,
-                    Binop::Div => div,
-                };
-                inst(self.bld, x, y, cstr!(""))
+                use Predicate::*;
+                match (op, float) {
+                    (Binop::Add, false) => LLVMBuildAdd(self.bld, x, y, cstr!("")),
+                    (Binop::Sub, false) => LLVMBuildSub(self.bld, x, y, cstr!("")),
+                    (Binop::Mul, false) => LLVMBuildMul(self.bld, x, y, cstr!("")),
+                    (Binop::Div, false) => LLVMBuildSDiv(self.bld, x, y, cstr!("")),
+
+                    (Binop::Add, true) => LLVMBuildFAdd(self.bld, x, y, cstr!("")),
+                    (Binop::Sub, true) => LLVMBuildFSub(self.bld, x, y, cstr!("")),
+                    (Binop::Mul, true) => LLVMBuildFMul(self.bld, x, y, cstr!("")),
+                    (Binop::Div, true) => LLVMBuildFDiv(self.bld, x, y, cstr!("")),
+
+                    (Binop::Cmp(pred), float) => {
+                        let pred = match (pred, float) {
+                            (Eq, true) => LLVMRealPredicate_LLVMRealOEQ,
+                            (Ne, true) => LLVMRealPredicate_LLVMRealONE,
+                            (Ge, true) => LLVMRealPredicate_LLVMRealOGE,
+                            (Le, true) => LLVMRealPredicate_LLVMRealOLE,
+                            (Gt, true) => LLVMRealPredicate_LLVMRealOGT,
+                            (Lt, true) => LLVMRealPredicate_LLVMRealOLT,
+
+                            (Eq, false) => LLVMIntPredicate_LLVMIntEQ,
+                            (Ne, false) => LLVMIntPredicate_LLVMIntNE,
+                            (Ge, false) => LLVMIntPredicate_LLVMIntSGE,
+                            (Le, false) => LLVMIntPredicate_LLVMIntSLE,
+                            (Gt, false) => LLVMIntPredicate_LLVMIntSGT,
+                            (Lt, false) => LLVMIntPredicate_LLVMIntSLT,
+                        };
+                        let cmp = if float { LLVMBuildFCmp } else { LLVMBuildICmp };
+                        cmp(self.bld, pred, x, y, cstr!(""))
+                    }
+                }
             }
             ExprKind::String(s) => {
                 let mut s = unescape(s);

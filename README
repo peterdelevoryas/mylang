@@ -4,5 +4,5 @@ fn printf(fmt: *i8, ...);
 // To see examples of all language features, check the filetests directory.
 
 fn main() {
-    printf("hello world\n");
+    printf("%d\n", 1 == 2);
 }

@@ -5,6 +5,12 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    EQ,
+    NE,
+    LT,
+    LE,
+    GT,
+    GE,
     IF,
     LPARENS,
     RPARENS,
@@ -138,6 +144,12 @@ impl<'a> Parser<'a> {
             '{' => (LBRACE, 1),
             '}' => (RBRACE, 1),
             '/' => (SLASH, 1),
+            '=' if d == '=' => (EQ, 2),
+            '!' if d == '=' => (NE, 2),
+            '<' if d == '=' => (LE, 2),
+            '>' if d == '=' => (GE, 2),
+            '<' => (LT, 1),
+            '>' => (GT, 1),
             '=' => (ASSIGN, 1),
             ',' => (COMMA, 1),
             ';' => (SEMICOLON, 1),
@@ -371,6 +383,7 @@ impl<'a> Parser<'a> {
     fn parse_binary(&mut self, mut lhs: Expr, min_precedence: i32) -> Expr {
         fn precedence(op: Token) -> i32 {
             match op {
+                LT | GT | LE | GE | EQ | NE => 10,
                 PLUS | MINUS => 20,
                 STAR | SLASH => 30,
                 _ => -1,
