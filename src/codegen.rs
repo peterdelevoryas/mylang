@@ -443,6 +443,34 @@ impl<'a> StmtBuilder<'a> {
             ExprKind::Call(func, args) => {
                 self.build_call(func, args, None)
             }
+            ExprKind::Cast(e, ty) => {
+                let dst_ty = self.tybld.irtype(*ty);
+                let src_ty = self.tybld.irtype(e.ty);
+                let dst_llty = self.tybld.lltype(*ty);
+                let v = self.build_scalar(e);
+                match (src_ty, dst_ty) {
+                    (Type::I8, Type::I8) | (Type::I16, Type::I16) |
+                    (Type::I32, Type::I32) | (Type::I64, Type::I64) |
+                    (Type::F32, Type::F32) | (Type::F64, Type::F64) => v,
+
+                    (Type::I8, Type::I16) | (Type::I8, Type::I32) |
+                    (Type::I8, Type::I64) | (Type::I16, Type::I32) |
+                    (Type::I16, Type::I64) | (Type::I32, Type::I64) => {
+                        LLVMBuildSExt(self.bld, v, dst_llty, cstr!(""))
+                    }
+
+                    (Type::I64, Type::I32) | (Type::I64, Type::I16) |
+                    (Type::I64, Type::I8) | (Type::I32, Type::I16) |
+                    (Type::I32, Type::I8) | (Type::I16, Type::I8) => {
+                        LLVMBuildTrunc(self.bld, v, dst_llty, cstr!(""))
+                    }
+
+                    (Type::F32, Type::F64) => LLVMBuildFPExt(self.bld, v, dst_llty, cstr!("")),
+                    (Type::F64, Type::F32) => LLVMBuildFPTrunc(self.bld, v, dst_llty, cstr!("")),
+
+                    _ => panic!(),
+                }
+            }
             _ => panic!("expected scalar, got {:?}", e),
         }
     }

@@ -16,6 +16,7 @@ pub enum Token {
     ARROW,
     ASSIGN,
     FN,
+    AS,
     LET,
     RETURN,
     NAME,
@@ -91,6 +92,7 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(String, Expr)>),
     Field(Box<Expr>, String),
+    Cast(Box<Expr>, Type),
 }
 
 pub struct Parser<'a> {
@@ -167,6 +169,7 @@ impl<'a> Parser<'a> {
                 // keywords
                 let token = match &text[..n] {
                     b"fn" => FN,
+                    b"as" => AS,
                     b"let" => LET,
                     b"return" => RETURN,
                     b"type" => TYPE,
@@ -368,8 +371,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let lhs = self.parse_call();
+        let lhs = self.parse_as();
         self.parse_binary(lhs, 0)
+    }
+
+    fn parse_as(&mut self) -> Expr {
+        let mut x = self.parse_call();
+        while self.token == AS {
+            self.next();
+            let ty = self.parse_type();
+            x = Expr::Cast(x.into(), ty);
+        }
+        x
     }
 
     fn parse_field(&mut self) -> Expr {

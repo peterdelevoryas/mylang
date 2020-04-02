@@ -158,6 +158,11 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Cast(e, ty) => {
+                let e = self.build_expr(e, None);
+                let ty = self.module.build_type(ty);
+                (ExprKind::Cast(e.into(), ty), ty)
+            }
             syntax::Expr::Field(e, field_name) => {
                 let e = self.build_expr(e, None);
                 let sty = match self.module.types.get(e.ty) {
@@ -518,4 +523,5 @@ pub enum ExprKind {
     Struct(Vec<(u32, Expr)>),
     Field(Box<Expr>, u32),
     MethodCall(FuncId, Box<Expr>),
+    Cast(Box<Expr>, TypeId),
 }
