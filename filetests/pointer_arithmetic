@@ -1,7 +1,8 @@
 fn printf(fmt: *i8, ...);
 
 fn main() -> i32 {
-    let s: *i8 = "abcdefg";
+    // check: abcdefg
+    let s = "abcdefg";
     for let i = 0; i < 7; i = i + 1 {
         let c = *(s + i);
         printf("%c", c);

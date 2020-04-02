@@ -376,7 +376,11 @@ impl<'a> FuncBuilder<'a> {
                     _ => panic!(),
                 };
                 let x = self.build_expr(x, None);
-                let y = self.build_expr(y, Some(x.ty));
+                let y_ty = match self.module.types.get(x.ty) {
+                    Type::Pointer(_) => self.module.types.intern(Type::I32),
+                    _ => x.ty,
+                };
+                let y = self.build_expr(y, Some(y_ty));
                 let ty = match op {
                     Binop::Cmp(_) => self.module.types.intern(Type::Bool),
                     _ => x.ty,
@@ -526,6 +530,31 @@ pub enum Type {
     Struct(StructType),
     Unit,
     Bool,
+}
+
+impl Type {
+    pub fn kind(&self) -> TypeKind {
+        match self {
+            Type::I8 | Type::I16 | Type::I32 | Type::I64 => TypeKind::Int,
+            Type::F32 | Type::F64 => TypeKind::Float,
+            Type::Struct(_) => TypeKind::Struct,
+            Type::Unit => TypeKind::Unit,
+            Type::Bool => TypeKind::Bool,
+            Type::Func(_) => TypeKind::Func,
+            Type::Pointer(_) => TypeKind::Pointer,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum TypeKind {
+    Int,
+    Float,
+    Pointer,
+    Struct,
+    Unit,
+    Bool,
+    Func,
 }
 
 #[derive(Debug, Clone, PartialEq)]

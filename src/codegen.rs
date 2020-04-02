@@ -286,7 +286,9 @@ impl<'a> StmtBuilder<'a> {
                 LLVMPositionBuilderAtEnd(self.bld, then);
                 self.block = then;
                 self.build_block(body);
-                LLVMBuildBr(self.bld, done);
+                if LLVMGetBasicBlockTerminator(self.block).is_null() {
+                    LLVMBuildBr(self.bld, done);
+                }
                 LLVMPositionBuilderAtEnd(self.bld, done);
                 self.block = done;
             }
@@ -476,44 +478,57 @@ impl<'a> StmtBuilder<'a> {
             }
             ExprKind::Binary(op, x, y) => {
                 let irty = self.tybld.irtype(x.ty);
-                let float = match irty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => false,
-                    Type::F32 | Type::F64 => true,
-                    x => panic!("unexpected type {:?}", x),
-                };
+                let kind = irty.kind();
                 let x = self.build_scalar(x);
                 let y = self.build_scalar(y);
                 use Predicate::*;
-                match (op, float) {
-                    (Binop::Add, false) => LLVMBuildAdd(self.bld, x, y, cstr!("")),
-                    (Binop::Sub, false) => LLVMBuildSub(self.bld, x, y, cstr!("")),
-                    (Binop::Mul, false) => LLVMBuildMul(self.bld, x, y, cstr!("")),
-                    (Binop::Div, false) => LLVMBuildSDiv(self.bld, x, y, cstr!("")),
+                use TypeKind::*;
+                match (op, kind) {
+                    (Binop::Add, Int) => LLVMBuildAdd(self.bld, x, y, cstr!("")),
+                    (Binop::Sub, Int) => LLVMBuildSub(self.bld, x, y, cstr!("")),
+                    (Binop::Mul, Int) => LLVMBuildMul(self.bld, x, y, cstr!("")),
+                    (Binop::Div, Int) => LLVMBuildSDiv(self.bld, x, y, cstr!("")),
 
-                    (Binop::Add, true) => LLVMBuildFAdd(self.bld, x, y, cstr!("")),
-                    (Binop::Sub, true) => LLVMBuildFSub(self.bld, x, y, cstr!("")),
-                    (Binop::Mul, true) => LLVMBuildFMul(self.bld, x, y, cstr!("")),
-                    (Binop::Div, true) => LLVMBuildFDiv(self.bld, x, y, cstr!("")),
+                    (Binop::Add, Float) => LLVMBuildFAdd(self.bld, x, y, cstr!("")),
+                    (Binop::Sub, Float) => LLVMBuildFSub(self.bld, x, y, cstr!("")),
+                    (Binop::Mul, Float) => LLVMBuildFMul(self.bld, x, y, cstr!("")),
+                    (Binop::Div, Float) => LLVMBuildFDiv(self.bld, x, y, cstr!("")),
 
-                    (Binop::Cmp(pred), float) => {
-                        let pred = match (pred, float) {
-                            (Eq, true) => LLVMRealPredicate_LLVMRealOEQ,
-                            (Ne, true) => LLVMRealPredicate_LLVMRealONE,
-                            (Ge, true) => LLVMRealPredicate_LLVMRealOGE,
-                            (Le, true) => LLVMRealPredicate_LLVMRealOLE,
-                            (Gt, true) => LLVMRealPredicate_LLVMRealOGT,
-                            (Lt, true) => LLVMRealPredicate_LLVMRealOLT,
+                    (Binop::Add, Pointer) => {
+                        let ptr = self.tybld.lltype(e.ty);
+                        let elem = LLVMGetElementType(ptr);
+                        let mut idx = [y];
+                        let pidx = idx.as_mut_ptr();
+                        let nidx = idx.len() as u32;
+                        LLVMBuildGEP2(self.bld, elem, x, pidx, nidx, cstr!(""))
+                    }
 
-                            (Eq, false) => LLVMIntPredicate_LLVMIntEQ,
-                            (Ne, false) => LLVMIntPredicate_LLVMIntNE,
-                            (Ge, false) => LLVMIntPredicate_LLVMIntSGE,
-                            (Le, false) => LLVMIntPredicate_LLVMIntSLE,
-                            (Gt, false) => LLVMIntPredicate_LLVMIntSGT,
-                            (Lt, false) => LLVMIntPredicate_LLVMIntSLT,
+                    (Binop::Cmp(pred), _) => {
+                        let pred = match (pred, kind) {
+                            (Eq, Float) => LLVMRealPredicate_LLVMRealOEQ,
+                            (Ne, Float) => LLVMRealPredicate_LLVMRealONE,
+                            (Ge, Float) => LLVMRealPredicate_LLVMRealOGE,
+                            (Le, Float) => LLVMRealPredicate_LLVMRealOLE,
+                            (Gt, Float) => LLVMRealPredicate_LLVMRealOGT,
+                            (Lt, Float) => LLVMRealPredicate_LLVMRealOLT,
+
+                            (Eq, Int) => LLVMIntPredicate_LLVMIntEQ,
+                            (Ne, Int) => LLVMIntPredicate_LLVMIntNE,
+                            (Ge, Int) => LLVMIntPredicate_LLVMIntSGE,
+                            (Le, Int) => LLVMIntPredicate_LLVMIntSLE,
+                            (Gt, Int) => LLVMIntPredicate_LLVMIntSGT,
+                            (Lt, Int) => LLVMIntPredicate_LLVMIntSLT,
+
+                            (pred, kind) => unimplemented!("{:?} {:?}", pred, kind),
                         };
-                        let cmp = if float { LLVMBuildFCmp } else { LLVMBuildICmp };
+                        let cmp = match kind {
+                            Float => LLVMBuildFCmp,
+                            Int => LLVMBuildICmp,
+                            _ => panic!(),
+                        };
                         cmp(self.bld, pred, x, y, cstr!(""))
                     }
+                    (op, kind) => panic!("unimplemented {:?} {:?}", op, kind),
                 }
             }
             ExprKind::String(s) => {
