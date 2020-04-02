@@ -72,7 +72,7 @@ impl NameTable {
 }
 
 pub fn build(
-    struct_types: &[syntax::StructType],
+    type_decls: &[syntax::TypeDecl],
     func_decls: &[syntax::FuncDecl],
     func_bodys: &[syntax::FuncBody],
 ) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
@@ -86,8 +86,8 @@ pub fn build(
     b.add_type("f64", Type::F64);
     b.add_type("bool", Type::Bool);
 
-    for struct_type in struct_types {
-        b.add_struct_type(struct_type);
+    for type_decl in type_decls {
+        b.add_type_decl(type_decl);
     }
 
     for decl in func_decls {
@@ -486,18 +486,23 @@ impl ModuleBuilder {
         self.names.def(name, Def::Type(i));
     }
 
-    fn add_struct_type(&mut self, struct_type: &syntax::StructType) {
-        let mut fields = vec![];
-        for (name, ty) in &struct_type.fields {
-            let ty = self.build_type(ty);
-            fields.push((*name, ty));
-        }
-        let ty = StructType {
-            name: struct_type.name,
-            fields,
+    fn add_type_decl(&mut self, type_decl: &syntax::TypeDecl) {
+        let ty = match &type_decl.kind {
+            syntax::TypeDeclKind::Struct(fields) => {
+                let mut fields2 = vec![];
+                for (name, ty) in fields {
+                    let ty = self.build_type(ty);
+                    fields2.push((*name, ty));
+                }
+                let sty = StructType {
+                    name: type_decl.name,
+                    fields: fields2,
+                };
+                self.types.intern(Type::Struct(sty))
+            }
+            syntax::TypeDeclKind::Alias(ty) => self.build_type(ty),
         };
-        let ty = self.types.intern(Type::Struct(ty));
-        self.names.def(struct_type.name, Def::Type(ty));
+        self.names.def(type_decl.name, Def::Type(ty));
     }
 
     fn add_func_decl(&mut self, func: &syntax::FuncDecl) {

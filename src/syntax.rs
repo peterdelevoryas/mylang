@@ -60,6 +60,18 @@ pub enum Type {
 }
 
 #[derive(Debug, Clone)]
+pub struct TypeDecl {
+    pub name: String,
+    pub kind: TypeDeclKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeDeclKind {
+    Struct(Vec<(String, Type)>),
+    Alias(Type),
+}
+
+#[derive(Debug, Clone)]
 pub struct StructType {
     pub name: String,
     pub fields: Vec<(String, Type)>,
@@ -292,6 +304,44 @@ impl<'a> Parser<'a> {
             name: name,
             fields: fields,
         }
+    }
+
+    pub fn parse_type_decl(&mut self) -> TypeDecl {
+        self.parse(TYPE);
+        let name = self.token_string();
+        self.parse(NAME);
+        let kind = match self.token {
+            STRUCT => {
+                self.next();
+                self.parse(LBRACE);
+                let mut fields = vec![];
+                while self.token != RBRACE {
+                    let name = self.token_string();
+                    self.parse(NAME);
+                    self.parse(COLON);
+                    let ty = self.parse_type();
+                    fields.push((name, ty));
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RBRACE);
+                TypeDeclKind::Struct(fields)
+            }
+            ASSIGN => {
+                self.next();
+                let ty = self.parse_type();
+                self.parse(SEMICOLON);
+                TypeDeclKind::Alias(ty)
+            }
+            _ => {
+                print_cursor(self.text, self.start, self.end);
+                println!("expected struct or alias type declaration");
+                error();
+            }
+        };
+        TypeDecl { name, kind }
     }
 
     pub fn parse_func_decl(&mut self) -> FuncDecl {

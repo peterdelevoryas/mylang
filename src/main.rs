@@ -127,33 +127,40 @@ fn main() {
         token: syntax::EOF,
     };
     p.next();
-    let mut struct_types = vec![];
+    let mut type_decls = vec![];
     let mut func_decls = vec![];
     let mut func_bodys = vec![];
     while p.token != syntax::EOF {
-        if p.token == syntax::TYPE {
-            let struct_type = p.parse_struct_type();
-            struct_types.push(struct_type);
-            continue;
-        }
+        match p.token {
+            syntax::TYPE => {
+                let type_decl = p.parse_type_decl();
+                type_decls.push(type_decl);
+            }
+            syntax::FN => {
+                let decl = p.parse_func_decl();
+                let id = func_decls.len();
+                func_decls.push(decl);
+                if p.token == syntax::SEMICOLON {
+                    p.next();
+                    continue;
+                }
 
-        let decl = p.parse_func_decl();
-        let id = func_decls.len();
-        func_decls.push(decl);
-        if p.token == syntax::SEMICOLON {
-            p.next();
-            continue;
+                let body = p.parse_block();
+                let body = syntax::FuncBody { id: id, body: body };
+                func_bodys.push(body);
+            }
+            _ => {
+                print_cursor(p.text, p.start, p.start + 1);
+                println!("expected type or function");
+                error();
+            }
         }
-
-        let body = p.parse_block();
-        let body = syntax::FuncBody { id: id, body: body };
-        func_bodys.push(body);
     }
-    println!("{:?}", struct_types);
+    println!("{:?}", type_decls);
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
 
-    let (func_decls, func_bodys, types) = ir0::build(&struct_types, &func_decls, &func_bodys);
+    let (func_decls, func_bodys, types) = ir0::build(&type_decls, &func_decls, &func_bodys);
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
     println!("{:?}", types);
