@@ -28,6 +28,7 @@ pub enum Token {
     DOT,
     TYPE,
     STRUCT,
+    SLASH,
     EOF,
 }
 pub use Token::*;
@@ -129,6 +130,7 @@ impl<'a> Parser<'a> {
             ')' => (RPARENS, 1),
             '{' => (LBRACE, 1),
             '}' => (RBRACE, 1),
+            '/' => (SLASH, 1),
             '=' => (ASSIGN, 1),
             ',' => (COMMA, 1),
             ';' => (SEMICOLON, 1),
@@ -344,6 +346,7 @@ impl<'a> Parser<'a> {
         fn precedence(op: Token) -> i32 {
             match op {
                 PLUS | MINUS => 20,
+                STAR | SLASH => 30,
                 _ => -1,
             }
         }

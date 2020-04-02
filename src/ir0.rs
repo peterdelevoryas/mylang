@@ -289,6 +289,8 @@ impl<'a> FuncBuilder<'a> {
                 let op = match op {
                     syntax::PLUS => Binop::Add,
                     syntax::MINUS => Binop::Sub,
+                    syntax::STAR => Binop::Mul,
+                    syntax::SLASH => Binop::Div,
                     _ => panic!(),
                 };
                 let ty = x.ty;
@@ -498,6 +500,8 @@ pub struct Expr {
 pub enum Binop {
     Add,
     Sub,
+    Mul,
+    Div,
 }
 
 #[derive(Debug)]

@@ -403,11 +403,34 @@ impl<'a> StmtBuilder<'a> {
                 self.llfuncs[*i]
             }
             ExprKind::Binary(op, x, y) => {
+                let irty = self.tybld.irtype(e.ty);
+                let add = match irty {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildAdd,
+                    Type::F32 | Type::F64 => LLVMBuildFAdd,
+                    _ => unreachable!(),
+                };
+                let sub = match irty {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildSub,
+                    Type::F32 | Type::F64 => LLVMBuildFSub,
+                    _ => unreachable!(),
+                };
+                let mul = match irty {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildMul,
+                    Type::F32 | Type::F64 => LLVMBuildFMul,
+                    _ => unreachable!(),
+                };
+                let div = match irty {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => LLVMBuildMul,
+                    Type::F32 | Type::F64 => LLVMBuildFMul,
+                    _ => unreachable!(),
+                };
                 let x = self.build_scalar(x);
                 let y = self.build_scalar(y);
                 let inst = match op {
-                    Binop::Add => LLVMBuildAdd,
-                    Binop::Sub => LLVMBuildSub,
+                    Binop::Add => add,
+                    Binop::Sub => sub,
+                    Binop::Mul => mul,
+                    Binop::Div => div,
                 };
                 inst(self.bld, x, y, cstr!(""))
             }
