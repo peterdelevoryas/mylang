@@ -1,13 +1,14 @@
 fn printf(fmt: *i8, ...);
 
-// This is an example R2 program.
-// To see examples of all language features, check the filetests directory.
-
-fn main() {
+fn main() -> i32 {
+    // check: 0123456789
     let i = 0;
     while i < 10 {
         printf("%d", i);
         i = i + 1;
     }
     printf("\n");
+    return 0;
 }
+
+

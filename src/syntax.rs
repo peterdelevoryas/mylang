@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    WHILE,
     EQ,
     NE,
     LT,
@@ -89,6 +90,8 @@ pub enum Stmt {
     Return(Expr),
     Expr(Expr),
     If(Expr, Block),
+    While(Expr, Block),
+    Assign(Expr, Expr),
 }
 
 #[derive(Debug)]
@@ -185,6 +188,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"while" => WHILE,
                     b"if" => IF,
                     b"fn" => FN,
                     b"as" => AS,
@@ -337,6 +341,12 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.token {
+            WHILE => {
+                self.next();
+                let cond = self.parse_expr();
+                let body = self.parse_block();
+                Stmt::While(cond, body)
+            }
             IF => {
                 self.next();
                 let cond = self.parse_expr();
@@ -374,8 +384,16 @@ impl<'a> Parser<'a> {
             }
             _ => {
                 let e = self.parse_expr();
+                let stmt = match self.token {
+                    ASSIGN => {
+                        self.next();
+                        let x = self.parse_expr();
+                        Stmt::Assign(e, x)
+                    }
+                    _ => Stmt::Expr(e),
+                };
                 self.parse(SEMICOLON);
-                Stmt::Expr(e)
+                stmt
             }
         }
     }
