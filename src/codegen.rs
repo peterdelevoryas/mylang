@@ -202,16 +202,13 @@ unsafe fn build_func_body(
         llfunc: llfunc,
         locals: locals,
         sret: sret,
+        block: entry,
     };
-    for stmt in &body.stmts {
-        b.build_stmt(stmt);
-    }
+    b.build_block(&body.body);
 
-    let b = b.bld;
-
-    let term = LLVMGetBasicBlockTerminator(entry);
+    let term = LLVMGetBasicBlockTerminator(b.block);
     if term.is_null() {
-        LLVMBuildRetVoid(b);
+        LLVMBuildRetVoid(b.bld);
     }
 }
 
@@ -223,6 +220,8 @@ struct StmtBuilder<'a> {
     llfunc: LLVMValueRef,
     locals: &'a [LLVMValueRef],
     sret: Option<LLVMValueRef>,
+
+    block: LLVMBasicBlockRef,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -233,8 +232,26 @@ enum Value {
 }
 
 impl<'a> StmtBuilder<'a> {
+    unsafe fn build_block(&mut self, block: &Block) {
+        for stmt in &block.stmts {
+            self.build_stmt(stmt);
+        }
+    }
+
     unsafe fn build_stmt(&mut self, stmt: &Stmt) {
         match stmt {
+            Stmt::If(cond, body) => {
+                let cond = self.build_scalar(cond);
+                let then = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                let done = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                LLVMBuildCondBr(self.bld, cond, then, done);
+                LLVMPositionBuilderAtEnd(self.bld, then);
+                self.block = then;
+                self.build_block(body);
+                LLVMBuildBr(self.bld, done);
+                LLVMPositionBuilderAtEnd(self.bld, done);
+                self.block = done;
+            }
             Stmt::Assign(x, y) => {
                 let p = self.build_place(x);
                 let _ = self.build_expr(y, Some(p));

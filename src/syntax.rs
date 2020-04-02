@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    IF,
     LPARENS,
     RPARENS,
     LBRACE,
@@ -81,6 +82,7 @@ pub enum Stmt {
     Let(String, Option<Type>, Expr),
     Return(Expr),
     Expr(Expr),
+    If(Expr, Block),
 }
 
 #[derive(Debug)]
@@ -171,6 +173,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"if" => IF,
                     b"fn" => FN,
                     b"as" => AS,
                     b"let" => LET,
@@ -309,13 +312,25 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_block(&mut self) -> Block {
-        let stmts = self.parse_list(|p| p.parse_stmt(), LBRACE, RBRACE, SEMICOLON);
+        self.parse(LBRACE);
+        let mut stmts = vec![];
+        while self.token != RBRACE {
+            let stmt = self.parse_stmt();
+            stmts.push(stmt);
+        }
+        self.parse(RBRACE);
 
         Block { stmts }
     }
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.token {
+            IF => {
+                self.next();
+                let cond = self.parse_expr();
+                let body = self.parse_block();
+                Stmt::If(cond, body)
+            }
             LET => {
                 self.next();
 
@@ -332,6 +347,7 @@ impl<'a> Parser<'a> {
 
                 self.parse(ASSIGN);
                 let e = self.parse_expr();
+                self.parse(SEMICOLON);
 
                 Stmt::Let(name, ty, e)
             }
@@ -341,10 +357,12 @@ impl<'a> Parser<'a> {
                     SEMICOLON => Expr::Unit,
                     _ => self.parse_expr(),
                 };
+                self.parse(SEMICOLON);
                 Stmt::Return(e)
             }
             _ => {
                 let e = self.parse_expr();
+                self.parse(SEMICOLON);
                 Stmt::Expr(e)
             }
         }

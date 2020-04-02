@@ -88,14 +88,16 @@ pub fn build(
 
     let mut bodys = vec![];
     for func in func_bodys {
-        let body = FuncBody {
-            id: func.id,
-            locals: vec![],
-            stmts: vec![],
-        };
         let b = FuncBuilder {
             module: &mut b,
-            body: body,
+            body: FuncBody {
+                id: func.id,
+                locals: vec![],
+                // FIXME This block is unnecessary.
+                body: Block {
+                    stmts: vec![],
+                },
+            },
         };
         let body = b.build_body(&func.body);
         bodys.push(body);
@@ -116,22 +118,33 @@ impl<'a> FuncBuilder<'a> {
         for (i, name) in decl.params.iter().enumerate() {
             self.module.names.def(*name, Def::Param(i));
         }
-        self.build_block(block);
+        self.body.body = self.build_block(block);
         self.module.names.exit_scope(scope);
 
         self.body
     }
 
-    fn build_block(&mut self, block: &syntax::Block) {
+    fn build_block(&mut self, block: &syntax::Block) -> Block {
         let scope = self.module.names.enter_scope();
+        let mut block2 = Block {
+            stmts: vec![],
+        };
         for stmt in &block.stmts {
-            self.build_stmt(stmt);
+            let stmt = self.build_stmt(stmt);
+            block2.stmts.push(stmt);
         }
         self.module.names.exit_scope(scope);
+        block2
     }
 
-    fn build_stmt(&mut self, stmt: &syntax::Stmt) {
-        let stmt = match stmt {
+    fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Stmt {
+        match stmt {
+            syntax::Stmt::If(cond, body) => {
+                let bool = self.module.types.intern(Type::Bool);
+                let cond = self.build_expr(cond, Some(bool));
+                let body = self.build_block(body);
+                Stmt::If(cond, body)
+            }
             syntax::Stmt::Let(name, ty, e) => {
                 let ty = ty.as_ref().map(|ty| self.module.build_type(ty));
                 let e = self.build_expr(e, ty);
@@ -153,8 +166,7 @@ impl<'a> FuncBuilder<'a> {
                 let e = self.build_expr(e, None);
                 Stmt::Expr(e)
             }
-        };
-        self.body.stmts.push(stmt);
+        }
     }
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
@@ -491,6 +503,11 @@ pub struct FuncDecl {
 pub struct FuncBody {
     pub id: FuncId,
     pub locals: Vec<TypeId>,
+    pub body: Block,
+}
+
+#[derive(Debug)]
+pub struct Block {
     pub stmts: Vec<Stmt>,
 }
 
@@ -499,6 +516,7 @@ pub enum Stmt {
     Assign(Expr, Expr),
     Return(Expr),
     Expr(Expr),
+    If(Expr, Block),
 }
 
 #[derive(Debug)]
