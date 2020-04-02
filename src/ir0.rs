@@ -23,6 +23,14 @@ impl TypeIntern {
     fn get(&self, i: TypeId) -> &Type {
         &self.types[i]
     }
+
+    fn auto_deref(&self, i: TypeId) -> &Type {
+        let mut ty = self.get(i);
+        while let Type::Pointer(i) = ty {
+            ty = self.get(*i);
+        }
+        ty
+    }
 }
 
 #[derive(Debug, Default)]
@@ -230,7 +238,7 @@ impl<'a> FuncBuilder<'a> {
             }
             syntax::Expr::Field(e, field_name) => {
                 let e = self.build_expr(e, None);
-                let sty = match self.module.types.get(e.ty) {
+                let sty = match self.module.types.auto_deref(e.ty) {
                     Type::Struct(sty) => sty,
                     _ => panic!(),
                 };

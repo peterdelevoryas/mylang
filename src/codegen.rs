@@ -312,9 +312,20 @@ impl<'a> StmtBuilder<'a> {
         match &e.kind {
             ExprKind::Local(i) => self.locals[*i],
             ExprKind::Field(x, i) => {
-                let p = self.build_place(x);
-                let sty = self.tybld.lltype(x.ty);
-                LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
+                let ty = self.tybld.irtype(x.ty);
+                match ty {
+                    Type::Struct(_) => {
+                        let sty = self.tybld.lltype(x.ty);
+                        let p = self.build_place(x);
+                        LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
+                    }
+                    Type::Pointer(ty) => {
+                        let sty = self.tybld.lltype(*ty);
+                        let p = self.build_scalar(x);
+                        LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
+                    }
+                    _ => panic!(),
+                }
             }
             ExprKind::Param(i) => {
                 let ty = self.tybld.lltype(e.ty);
@@ -322,6 +333,7 @@ impl<'a> StmtBuilder<'a> {
                 assert_eq!(kind, LLVMTypeKind_LLVMStructTypeKind);
                 LLVMGetParam(self.llfunc, *i as u32)
             }
+            ExprKind::Unary(Unop::Deref, p) => self.build_scalar(p),
             k => unimplemented!("build place {:?}", k),
         }
     }
