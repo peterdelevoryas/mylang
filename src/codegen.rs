@@ -572,12 +572,14 @@ impl<'a> StmtBuilder<'a> {
                         LLVMBuildTrunc(self.bld, v, dst_llty, cstr!(""))
                     }
 
+                    (Type::I32, Type::F32) | (Type::I32, Type::F64) => LLVMBuildSIToFP(self.bld, v, dst_llty, cstr!("")),
+
                     (Type::F32, Type::F64) => LLVMBuildFPExt(self.bld, v, dst_llty, cstr!("")),
                     (Type::F64, Type::F32) => LLVMBuildFPTrunc(self.bld, v, dst_llty, cstr!("")),
 
                     (Type::Pointer(_), Type::Pointer(_)) => LLVMBuildPointerCast(self.bld, v, dst_llty, cstr!("")),
 
-                    _ => panic!(),
+                    (x, y) => unimplemented!("{:?} {:?}", x, y),
                 }
             }
             ExprKind::Bool(true) => LLVMConstInt(LLVMInt1Type(), 1, 0),
