@@ -451,7 +451,7 @@ impl<'a> Parser<'a> {
             let op = self.token;
             let i = precedence(op);
             self.next();
-            let mut rhs = self.parse_call();
+            let mut rhs = self.parse_as();
             while precedence(self.token) > i {
                 let j = precedence(self.token);
                 rhs = self.parse_binary(rhs, j);

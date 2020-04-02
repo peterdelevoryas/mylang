@@ -573,6 +573,7 @@ impl<'a> StmtBuilder<'a> {
                     }
 
                     (Type::I32, Type::F32) | (Type::I32, Type::F64) => LLVMBuildSIToFP(self.bld, v, dst_llty, cstr!("")),
+                    (Type::F32, Type::I32) => LLVMBuildFPToSI(self.bld, v, dst_llty, cstr!("")),
 
                     (Type::F32, Type::F64) => LLVMBuildFPExt(self.bld, v, dst_llty, cstr!("")),
                     (Type::F64, Type::F32) => LLVMBuildFPTrunc(self.bld, v, dst_llty, cstr!("")),
