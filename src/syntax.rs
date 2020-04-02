@@ -5,6 +5,8 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    PLUSEQ,
+    MINUSEQ,
     AMPERSAND,
     FOR,
     WHILE,
@@ -83,12 +85,12 @@ pub struct FuncBody {
     pub body: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Let(String, Option<Type>, Expr),
     Return(Expr),
@@ -97,9 +99,10 @@ pub enum Stmt {
     While(Expr, Block),
     Assign(Expr, Expr),
     For(Box<Stmt>, Expr, Box<Stmt>, Block),
+    OpAssign(Token, Expr, Expr),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Unit,
     Integer(String),
@@ -147,8 +150,10 @@ impl<'a> Parser<'a> {
 
         let (token, n) = match c {
             '-' if d == '>' => (ARROW, 2),
+            '-' if d == '-' => (MINUSEQ, 2),
             '-' => (MINUS, 1),
             '&' => (AMPERSAND, 1),
+            '+' if d == '=' => (PLUSEQ, 2),
             '+' => (PLUS, 1),
             '(' => (LPARENS, 1),
             ')' => (RPARENS, 1),
@@ -411,6 +416,16 @@ impl<'a> Parser<'a> {
                         self.next();
                         let x = self.parse_expr();
                         Stmt::Assign(e, x)
+                    }
+                    PLUSEQ | MINUSEQ => {
+                        let op = match self.token {
+                            PLUSEQ => PLUS,
+                            MINUSEQ => MINUS,
+                            _ => unreachable!(),
+                        };
+                        self.next();
+                        let x = self.parse_expr();
+                        Stmt::OpAssign(op, e.into(), x.into())
                     }
                     _ => Stmt::Expr(e),
                 };

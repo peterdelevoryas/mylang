@@ -157,6 +157,14 @@ impl<'a> FuncBuilder<'a> {
                 self.module.names.exit_scope(scope);
                 Stmt::For(init.into(), cond, post.into(), body)
             }
+            syntax::Stmt::OpAssign(op, x, y) => {
+                let x2 = Box::new((*x).clone());
+                let y2 = Box::new((*y).clone());
+                let rhs = syntax::Expr::Binary(*op, x2, y2);
+                let lhs = self.build_expr(x, None);
+                let rhs = self.build_expr(&rhs, Some(lhs.ty));
+                Stmt::Assign(lhs, rhs)
+            }
             syntax::Stmt::Assign(x, y) => {
                 let x = self.build_expr(x, None);
                 let y = self.build_expr(y, Some(x.ty));
