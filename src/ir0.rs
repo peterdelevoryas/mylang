@@ -139,6 +139,16 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Stmt {
         match stmt {
+            syntax::Stmt::For(init, cond, post, body) => {
+                let scope = self.module.names.enter_scope();
+                let init = self.build_stmt(init);
+                let bool = self.module.types.intern(Type::Bool);
+                let cond = self.build_expr(cond, Some(bool));
+                let post = self.build_stmt(post);
+                let body = self.build_block(body);
+                self.module.names.exit_scope(scope);
+                Stmt::For(init.into(), cond, post.into(), body)
+            }
             syntax::Stmt::Assign(x, y) => {
                 let x = self.build_expr(x, None);
                 let y = self.build_expr(y, Some(x.ty));
@@ -538,6 +548,7 @@ pub enum Stmt {
     Expr(Expr),
     If(Expr, Block),
     While(Expr, Block),
+    For(Box<Stmt>, Expr, Box<Stmt>, Block),
 }
 
 #[derive(Debug)]

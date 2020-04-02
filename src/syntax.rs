@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    FOR,
     WHILE,
     EQ,
     NE,
@@ -92,6 +93,7 @@ pub enum Stmt {
     If(Expr, Block),
     While(Expr, Block),
     Assign(Expr, Expr),
+    For(Box<Stmt>, Expr, Box<Stmt>, Block),
 }
 
 #[derive(Debug)]
@@ -188,6 +190,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"for" => FOR,
                     b"while" => WHILE,
                     b"if" => IF,
                     b"fn" => FN,
@@ -333,6 +336,9 @@ impl<'a> Parser<'a> {
         while self.token != RBRACE {
             let stmt = self.parse_stmt();
             stmts.push(stmt);
+            if self.token == SEMICOLON {
+                self.next();
+            }
         }
         self.parse(RBRACE);
 
@@ -341,6 +347,16 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.token {
+            FOR => {
+                self.next();
+                let init = self.parse_stmt();
+                self.parse(SEMICOLON);
+                let cond = self.parse_expr();
+                self.parse(SEMICOLON);
+                let post = self.parse_stmt();
+                let body = self.parse_block();
+                Stmt::For(init.into(), cond, post.into(), body)
+            }
             WHILE => {
                 self.next();
                 let cond = self.parse_expr();
@@ -369,7 +385,6 @@ impl<'a> Parser<'a> {
 
                 self.parse(ASSIGN);
                 let e = self.parse_expr();
-                self.parse(SEMICOLON);
 
                 Stmt::Let(name, ty, e)
             }
@@ -379,7 +394,6 @@ impl<'a> Parser<'a> {
                     SEMICOLON => Expr::Unit,
                     _ => self.parse_expr(),
                 };
-                self.parse(SEMICOLON);
                 Stmt::Return(e)
             }
             _ => {
@@ -392,7 +406,6 @@ impl<'a> Parser<'a> {
                     }
                     _ => Stmt::Expr(e),
                 };
-                self.parse(SEMICOLON);
                 stmt
             }
         }

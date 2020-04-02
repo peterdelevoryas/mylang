@@ -240,6 +240,28 @@ impl<'a> StmtBuilder<'a> {
 
     unsafe fn build_stmt(&mut self, stmt: &Stmt) {
         match stmt {
+            Stmt::For(init, cond, post, body) => {
+                self.build_stmt(init);
+                let head = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                let then = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                let tail = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                let done = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
+                LLVMBuildBr(self.bld, head);
+                LLVMPositionBuilderAtEnd(self.bld, head);
+                self.block = head;
+                let cond = self.build_scalar(cond);
+                LLVMBuildCondBr(self.bld, cond, then, done);
+                LLVMPositionBuilderAtEnd(self.bld, then);
+                self.block = then;
+                self.build_block(body);
+                LLVMBuildBr(self.bld, tail);
+                LLVMPositionBuilderAtEnd(self.bld, tail);
+                self.block = tail;
+                self.build_stmt(post);
+                LLVMBuildBr(self.bld, head);
+                LLVMPositionBuilderAtEnd(self.bld, done);
+                self.block = done;
+            }
             Stmt::While(cond, body) => {
                 let head = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let then = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
