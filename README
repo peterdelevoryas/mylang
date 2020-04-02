@@ -1,26 +1,71 @@
 fn printf(fmt: *i8, ...);
+fn sprintf(str: *i8, fmt: *i8, ...);
 fn malloc(size: i64) -> *i8;
 fn free(ptr: *i8);
+fn memset(ptr: *i8, c: i32, len: i64) -> *i8;
+fn sleep(seconds: i32) -> i32;
+fn rand() -> i32;
 
-type data struct {
+type grid struct {
+    w: i32,
+    h: i32,
+}
+
+fn print(g: grid, b: bug) {
+    for let i = 0; i < g.h; i += 1 {
+        for let j = 0; j < g.w; j += 1 {
+            let c = "_"[0];
+
+            if i == b.y {
+                if j == b.x {
+                    c = "x"[0];
+                }
+            }
+
+            printf("%c ", c);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+type bug struct {
     x: i32,
     y: i32,
-    z: i32,
 }
 
-fn print(x: *data) {
-    printf("%d %d %d\n", x.x, x.y, x.z);
+fn min(x: i32, y: i32) -> i32 {
+    if x > y {
+        return y;
+    }
+    return x;
 }
+
+fn move(g: grid, b: *bug) {
+    let RAND_MAX = 2147483647;
+    let dx = (rand() as f32) / (RAND_MAX as f32);
+    let dy = (rand() as f32) / (RAND_MAX as f32);
+    let dx = g.w as f32 * dx / 2.0;
+    let dy = g.h as f32 * dy / 2.0;
+    let dx = dx as i32;
+    let dy = dy as i32;
+    printf("dx %d dy %d\n", dx as i32, dy as i32);
+    b.x = min(b.x + dx, g.w - 1);
+    b.y = min(b.y + dy, g.h - 1);
+    printf("x %d y %d\n", b.x, b.y);
+}
+
+// This is an example R2 program, that prints a little bug that moves around
+// a grid.
 
 fn main() -> i32 {
-    let n = 10;
-    let x: *data = malloc(sizeof(data) * (n as i64)) as *data;
-    for let i = 0; i < n; i += 1 {
-        x[i] = { x: i * 1, y: i * 2, z: i * 3, };
+    let b: bug = { x: 0, y: 0, };
+    let g: grid = { w: 10, h: 10, };
+    g.print(b);
+    for let i = 0; i < 10; i += 1 {
+        g.move(&b);
+        g.print(b);
+        sleep(1);
     }
-    for let i = 0; i < n; i += 1 {
-        print(&x[i]);
-    }
-
     return 0;
 }
