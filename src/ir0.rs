@@ -208,6 +208,11 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Sizeof(ty) => {
+                let ty = self.module.build_type(ty);
+                let i64 = self.module.types.intern(Type::I64);
+                (ExprKind::Sizeof(ty), i64)
+            }
             syntax::Expr::Index(p, i) => {
                 let env = match env {
                     Some(ty) => Some(self.module.types.intern(Type::Pointer(ty))),
@@ -686,4 +691,5 @@ pub enum ExprKind {
     MethodCall(FuncId, Box<Expr>),
     Cast(Box<Expr>, TypeId),
     Bool(bool),
+    Sizeof(TypeId),
 }

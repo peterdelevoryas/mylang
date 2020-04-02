@@ -13,6 +13,16 @@ fn print(x: *data) {
 }
 
 fn main() -> i32 {
+    // check: 0 0 0
+    // nextln: 1 2 3
+    // nextln: 2 4 6
+    // nextln: 3 6 9
+    // nextln: 4 8 12
+    // nextln: 5 10 15
+    // nextln: 6 12 18
+    // nextln: 7 14 21
+    // nextln: 8 16 24
+    // nextln: 9 18 27
     let n = 10;
     let x: *data = malloc(sizeof(data) * (n as i64)) as *data;
     for let i = 0; i < n; i += 1 {

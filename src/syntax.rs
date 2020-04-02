@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    SIZEOF,
     PLUSEQ,
     MINUSEQ,
     AMPERSAND,
@@ -117,6 +118,7 @@ pub enum Expr {
     Index(Box<Expr>, Box<Expr>),
     Cast(Box<Expr>, Type),
     Bool(bool),
+    Sizeof(Type),
 }
 
 pub struct Parser<'a> {
@@ -203,6 +205,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"sizeof" => SIZEOF,
                     b"for" => FOR,
                     b"while" => WHILE,
                     b"if" => IF,
@@ -461,12 +464,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let lhs = self.parse_as();
+        let lhs = self.parse_unary();
         self.parse_binary(lhs, 0)
     }
 
     fn parse_as(&mut self) -> Expr {
-        let mut x = self.parse_unary();
+        let mut x = self.parse_call();
         while self.token == AS {
             self.next();
             let ty = self.parse_type();
@@ -483,12 +486,12 @@ impl<'a> Parser<'a> {
                 let e = self.parse_unary();
                 Expr::Unary(op, e.into())
             }
-            _ => self.parse_index(),
+            _ => self.parse_as(),
         }
     }
 
     fn parse_index(&mut self) -> Expr {
-        let mut x = self.parse_call();
+        let mut x = self.parse_field();
         while self.token == LBRACKET {
             self.next();
             let i = self.parse_expr();
@@ -511,7 +514,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_call(&mut self) -> Expr {
-        let mut x = self.parse_field();
+        let mut x = self.parse_index();
         while self.token == LPARENS {
             self.next();
 
@@ -534,6 +537,13 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            SIZEOF => {
+                self.next();
+                self.parse(LPARENS);
+                let ty = self.parse_type();
+                self.parse(RPARENS);
+                Expr::Sizeof(ty)
+            }
             LBRACE => {
                 self.next();
                 let mut fields = vec![];

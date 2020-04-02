@@ -575,6 +575,8 @@ impl<'a> StmtBuilder<'a> {
                     (Type::F32, Type::F64) => LLVMBuildFPExt(self.bld, v, dst_llty, cstr!("")),
                     (Type::F64, Type::F32) => LLVMBuildFPTrunc(self.bld, v, dst_llty, cstr!("")),
 
+                    (Type::Pointer(_), Type::Pointer(_)) => LLVMBuildPointerCast(self.bld, v, dst_llty, cstr!("")),
+
                     _ => panic!(),
                 }
             }
@@ -587,6 +589,10 @@ impl<'a> StmtBuilder<'a> {
                 let lltype = self.tybld.lltype(e.ty);
                 let p = self.build_scalar(p);
                 LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
+            }
+            ExprKind::Sizeof(ty) => {
+                let lltype = self.tybld.lltype(*ty);
+                LLVMSizeOf(lltype)
             }
             _ => panic!("expected scalar, got {:?}", e),
         }
