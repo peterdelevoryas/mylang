@@ -15,6 +15,8 @@ pub enum Token {
     GT,
     GE,
     IF,
+    LBRACKET,
+    RBRACKET,
     LPARENS,
     RPARENS,
     LBRACE,
@@ -109,6 +111,7 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(String, Expr)>),
     Field(Box<Expr>, String),
+    Index(Box<Expr>, Box<Expr>),
     Cast(Box<Expr>, Type),
     Bool(bool),
 }
@@ -151,6 +154,8 @@ impl<'a> Parser<'a> {
             ')' => (RPARENS, 1),
             '{' => (LBRACE, 1),
             '}' => (RBRACE, 1),
+            '[' => (LBRACKET, 1),
+            ']' => (RBRACKET, 1),
             '/' => (SLASH, 1),
             '=' if d == '=' => (EQ, 2),
             '!' if d == '=' => (NE, 2),
@@ -463,8 +468,20 @@ impl<'a> Parser<'a> {
                 let e = self.parse_unary();
                 Expr::Unary(op, e.into())
             }
-            _ => self.parse_call(),
+            _ => self.parse_index(),
         }
+    }
+
+    fn parse_index(&mut self) -> Expr {
+        let mut x = self.parse_call();
+        while self.token == LBRACKET {
+            self.next();
+            let i = self.parse_expr();
+            self.parse(RBRACKET);
+
+            x = Expr::Index(x.into(), i.into());
+        }
+        x
     }
 
     fn parse_field(&mut self) -> Expr {

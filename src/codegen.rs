@@ -313,6 +313,16 @@ impl<'a> StmtBuilder<'a> {
     unsafe fn build_place(&mut self, e: &Expr) -> LLVMValueRef {
         match &e.kind {
             ExprKind::Local(i) => self.locals[*i],
+            ExprKind::Index(p, i) => {
+                let ptr = self.tybld.lltype(p.ty);
+                let elem = LLVMGetElementType(ptr);
+                let p = self.build_scalar(p);
+                let i = self.build_scalar(i);
+                let mut idx = [i];
+                let pidx = idx.as_mut_ptr();
+                let nidx = idx.len() as u32;
+                LLVMBuildGEP2(self.bld, elem, p, pidx, nidx, cstr!(""))
+            }
             ExprKind::Field(x, i) => {
                 let ty = self.tybld.irtype(x.ty);
                 match ty {
@@ -447,10 +457,10 @@ impl<'a> StmtBuilder<'a> {
 
     unsafe fn build_scalar(&mut self, e: &Expr) -> LLVMValueRef {
         match &e.kind {
-            ExprKind::Field(_, _) => {
+            ExprKind::Index(_, _) | ExprKind::Field(_, _) => {
                 let p = self.build_place(e);
-                let field_type = self.tybld.lltype(e.ty);
-                LLVMBuildLoad2(self.bld, field_type, p, cstr!(""))
+                let elem_type = self.tybld.lltype(e.ty);
+                LLVMBuildLoad2(self.bld, elem_type, p, cstr!(""))
             }
             ExprKind::Float(s) => {
                 let lltype = self.tybld.lltype(e.ty);

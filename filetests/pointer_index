@@ -3,6 +3,7 @@ fn malloc(size: i64) -> *i8;
 fn free(ptr: *i8);
 
 fn main() -> i32 {
+    // check: 0123456789
     let x = malloc(10);
     for let i = 0; i < 10; i = i + 1 {
         x[i] = i as i8;

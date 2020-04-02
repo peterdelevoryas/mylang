@@ -200,6 +200,20 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Index(p, i) => {
+                let env = match env {
+                    Some(ty) => Some(self.module.types.intern(Type::Pointer(ty))),
+                    None => None,
+                };
+                let p = self.build_expr(p, env);
+                let i = self.build_expr(i, None);
+
+                let ty = match self.module.types.get(p.ty) {
+                    Type::Pointer(ty) => *ty,
+                    _ => panic!(),
+                };
+                (ExprKind::Index(p.into(), i.into()), ty)
+            }
             syntax::Expr::Unary(op, e) => match op {
                 syntax::AMPERSAND => {
                     let env = match env {
@@ -660,6 +674,7 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(u32, Expr)>),
     Field(Box<Expr>, u32),
+    Index(Box<Expr>, Box<Expr>),
     MethodCall(FuncId, Box<Expr>),
     Cast(Box<Expr>, TypeId),
     Bool(bool),
