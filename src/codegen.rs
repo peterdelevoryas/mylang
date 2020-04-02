@@ -108,6 +108,7 @@ impl<'a> TypeBuilder<'a> {
 
     unsafe fn build_type(&self, ty: TypeId) -> LLVMTypeRef {
         match self.irtype(ty) {
+            Type::Bool => LLVMInt1Type(),
             Type::I8 => LLVMInt8Type(),
             Type::I16 => LLVMInt16Type(),
             Type::I32 => LLVMInt32Type(),
@@ -471,6 +472,8 @@ impl<'a> StmtBuilder<'a> {
                     _ => panic!(),
                 }
             }
+            ExprKind::Bool(true) => LLVMConstInt(LLVMInt1Type(), 1, 0),
+            ExprKind::Bool(false) => LLVMConstInt(LLVMInt1Type(), 0, 0),
             _ => panic!("expected scalar, got {:?}", e),
         }
     }

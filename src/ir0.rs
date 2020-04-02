@@ -76,6 +76,7 @@ pub fn build(
     b.add_type("i64", Type::I64);
     b.add_type("f32", Type::F32);
     b.add_type("f64", Type::F64);
+    b.add_type("bool", Type::Bool);
 
     for struct_type in struct_types {
         b.add_struct_type(struct_type);
@@ -158,6 +159,10 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Bool(b) => {
+                let bool = self.module.types.intern(Type::Bool);
+                (ExprKind::Bool(*b), bool)
+            }
             syntax::Expr::Cast(e, ty) => {
                 let e = self.build_expr(e, None);
                 let ty = self.module.build_type(ty);
@@ -443,6 +448,7 @@ pub enum Type {
     Func(FuncType),
     Struct(StructType),
     Unit,
+    Bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -524,4 +530,5 @@ pub enum ExprKind {
     Field(Box<Expr>, u32),
     MethodCall(FuncId, Box<Expr>),
     Cast(Box<Expr>, TypeId),
+    Bool(bool),
 }

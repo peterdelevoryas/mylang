@@ -30,6 +30,8 @@ pub enum Token {
     TYPE,
     STRUCT,
     SLASH,
+    TRUE,
+    FALSE,
     EOF,
 }
 pub use Token::*;
@@ -93,6 +95,7 @@ pub enum Expr {
     Struct(Vec<(String, Expr)>),
     Field(Box<Expr>, String),
     Cast(Box<Expr>, Type),
+    Bool(bool),
 }
 
 pub struct Parser<'a> {
@@ -174,6 +177,8 @@ impl<'a> Parser<'a> {
                     b"return" => RETURN,
                     b"type" => TYPE,
                     b"struct" => STRUCT,
+                    b"true" => TRUE,
+                    b"false" => FALSE,
                     _ => NAME,
                 };
                 (token, n)
@@ -440,8 +445,24 @@ impl<'a> Parser<'a> {
             }
             LPARENS => {
                 self.next();
+                let e = match self.token {
+                    RPARENS => None,
+                    _ => Some(self.parse_expr()),
+                };
                 self.parse(RPARENS);
-                Expr::Unit
+
+                match e {
+                    Some(e) => e,
+                    None => Expr::Unit,
+                }
+            }
+            TRUE => {
+                self.next();
+                Expr::Bool(true)
+            }
+            FALSE => {
+                self.next();
+                Expr::Bool(false)
             }
             STRING => {
                 let s = self.token_string();
