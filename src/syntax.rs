@@ -113,7 +113,7 @@ pub struct Block {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    Let(String, Option<Type>, Expr),
+    Let(String, Option<Type>, Option<Expr>),
     Return(Expr),
     Expr(Expr),
     If(Expr, Block),
@@ -450,8 +450,14 @@ impl<'a> Parser<'a> {
                     _ => None,
                 };
 
-                self.parse(ASSIGN);
-                let e = self.parse_expr();
+                let e = match self.token {
+                    ASSIGN => {
+                        self.next();
+                        let e = self.parse_expr();
+                        Some(e)
+                    }
+                    _ => None,
+                };
 
                 Stmt::Let(name, ty, e)
             }

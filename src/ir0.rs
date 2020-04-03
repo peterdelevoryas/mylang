@@ -205,16 +205,32 @@ impl<'a> FuncBuilder<'a> {
                 Stmt::If(cond, body)
             }
             syntax::Stmt::Let(name, ty, e) => {
-                let ty = ty.as_ref().map(|ty| self.module.build_type(ty));
-                let e = self.build_expr(e, ty);
+                let ty = match ty {
+                    Some(ty) => Some(self.module.build_type(ty)),
+                    None => None,
+                };
+                let e = match e {
+                    Some(e) => Some(self.build_expr(e, ty)),
+                    None => None,
+                };
+                let ty = match (&e, ty) {
+                    (_, Some(ty)) => ty,
+                    (Some(e), _) => e.ty,
+                    _ => panic!("let must have type or expression"),
+                };
+
                 let i = self.body.locals.len();
                 let x = Expr {
                     kind: ExprKind::Local(i),
-                    ty: e.ty,
+                    ty: ty,
                 };
                 self.body.locals.push(x.ty);
                 self.module.names.def(*name, Def::Local(i));
-                Stmt::Assign(x, e)
+
+                match e {
+                    Some(e) => Stmt::Assign(x, e),
+                    None => Stmt::Expr(self.unit()),
+                }
             }
             syntax::Stmt::Return(e) => {
                 let ret = self.module.func_decls[self.body.id].ty.ret;
@@ -225,6 +241,14 @@ impl<'a> FuncBuilder<'a> {
                 let e = self.build_expr(e, None);
                 Stmt::Expr(e)
             }
+        }
+    }
+
+    fn unit(&mut self) -> Expr {
+        let ty = self.module.types.intern(Type::Unit);
+        Expr {
+            kind: ExprKind::Unit,
+            ty,
         }
     }
 
