@@ -5,6 +5,7 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    CONST,
     SIZEOF,
     PLUSEQ,
     MINUSEQ,
@@ -89,6 +90,13 @@ pub struct FuncDecl {
     pub name: String,
     pub params: Vec<String>,
     pub ty: FuncType,
+}
+
+#[derive(Debug)]
+pub struct ConstDecl {
+    pub name: String,
+    pub ty: Option<Type>,
+    pub value: Expr,
 }
 
 #[derive(Debug)]
@@ -217,6 +225,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"const" => CONST,
                     b"sizeof" => SIZEOF,
                     b"for" => FOR,
                     b"while" => WHILE,
@@ -280,30 +289,22 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_struct_type(&mut self) -> StructType {
-        self.parse(TYPE);
+    pub fn parse_const_decl(&mut self) -> ConstDecl {
+        self.parse(CONST);
         let name = self.token_string();
         self.parse(NAME);
-        self.parse(STRUCT);
-        self.parse(LBRACE);
-        let mut fields = vec![];
-        while self.token != RBRACE {
-            let name = self.token_string();
-            self.parse(NAME);
-            self.parse(COLON);
-            let ty = self.parse_type();
-            fields.push((name, ty));
-            if self.token != COMMA {
-                break;
+        let ty = match self.token {
+            COLON => {
+                self.next();
+                let ty = self.parse_type();
+                Some(ty)
             }
-            self.next();
-        }
-        self.parse(RBRACE);
-
-        StructType {
-            name: name,
-            fields: fields,
-        }
+            _ => None,
+        };
+        self.parse(ASSIGN);
+        let value = self.parse_expr();
+        self.parse(SEMICOLON);
+        ConstDecl { name, ty, value }
     }
 
     pub fn parse_type_decl(&mut self) -> TypeDecl {

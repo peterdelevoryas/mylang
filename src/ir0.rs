@@ -44,6 +44,7 @@ enum Def {
     Type(TypeId),
     Param(ParamId),
     Local(LocalId),
+    Const(ConstId),
 }
 
 impl NameTable {
@@ -71,11 +72,22 @@ impl NameTable {
     }
 }
 
-pub fn build(
-    type_decls: &[syntax::TypeDecl],
-    func_decls: &[syntax::FuncDecl],
-    func_bodys: &[syntax::FuncBody],
-) -> (Vec<FuncDecl>, Vec<FuncBody>, Vec<Type>) {
+use crate::Module;
+
+pub struct Module2 {
+    pub func_decls: Vec<FuncDecl>,
+    pub func_bodys: Vec<FuncBody>,
+    pub types: Vec<Type>,
+    pub consts: Vec<Const>,
+}
+
+#[derive(Debug)]
+pub struct Const {
+    pub name: String,
+    pub expr: Expr,
+}
+
+pub fn build(module: &Module) -> Module2 {
     let mut b = ModuleBuilder::default();
 
     b.add_type("i8", Type::I8);
@@ -86,16 +98,21 @@ pub fn build(
     b.add_type("f64", Type::F64);
     b.add_type("bool", Type::Bool);
 
-    for type_decl in type_decls {
+    for type_decl in &module.type_decls {
         b.add_type_decl(type_decl);
     }
 
-    for decl in func_decls {
+    for const_decl in &module.const_decls {
+        let i = b.add_const_decl(const_decl);
+        b.names.def(const_decl.name, Def::Const(i));
+    }
+
+    for decl in &module.func_decls {
         b.add_func_decl(decl);
     }
 
     let mut bodys = vec![];
-    for func in func_bodys {
+    for func in &module.func_bodys {
         let b = FuncBuilder {
             module: &mut b,
             body: FuncBody {
@@ -111,7 +128,12 @@ pub fn build(
         bodys.push(body);
     }
 
-    (b.func_decls, bodys, b.types.types)
+    Module2 {
+        func_decls: b.func_decls,
+        func_bodys: bodys,
+        types: b.types.types,
+        consts: b.consts,
+    }
 }
 
 struct FuncBuilder<'a> {
@@ -454,7 +476,11 @@ impl<'a> FuncBuilder<'a> {
                         let ty = self.module.func_decls[self.body.id].ty.params[i];
                         (ExprKind::Param(i), ty)
                     }
-                    _ => unimplemented!(),
+                    Def::Type(_) => panic!("encountered type in expression {:?}", name),
+                    Def::Const(i) => {
+                        let ty = self.module.consts[i].expr.ty;
+                        (ExprKind::Const(i), ty)
+                    }
                 },
             },
         };
@@ -476,6 +502,7 @@ impl<'a> FuncBuilder<'a> {
 struct ModuleBuilder {
     names: NameTable,
     types: TypeIntern,
+    consts: Vec<Const>,
     func_decls: Vec<FuncDecl>,
 }
 
@@ -484,6 +511,51 @@ impl ModuleBuilder {
         let name = intern(name);
         let i = self.types.intern(ty);
         self.names.def(name, Def::Type(i));
+    }
+
+    fn add_const_decl(&mut self, const_decl: &syntax::ConstDecl) -> ConstId {
+        let ty = match &const_decl.ty {
+            Some(ty) => Some(self.build_type(ty)),
+            None => None,
+        };
+        let expr = self.check_const_expr(&const_decl.value, ty);
+        let c = Const {
+            name: const_decl.name,
+            expr: expr,
+        };
+        let id = self.consts.len();
+        self.consts.push(c);
+        id
+    }
+
+    fn check_const_expr(&mut self, e: &syntax::Expr, ty: Option<TypeId>) -> Expr {
+        let e = self.infer_const_expr(e, ty);
+        if let Some(ty) = ty {
+            if e.ty != ty {
+                let expected = self.types.get(ty);
+                let got = self.types.get(e.ty);
+                println!("expected {:?}, got {:?}", expected, got);
+                error();
+            }
+        }
+        e
+    }
+
+    fn infer_const_expr(&mut self, e: &syntax::Expr, ty: Option<TypeId>) -> Expr {
+        match e {
+            syntax::Expr::Integer(s) => {
+                let kind = ExprKind::Integer(*s);
+                let ty = match ty {
+                    None => self.types.intern(Type::I32),
+                    Some(ty) => match self.types.get(ty) {
+                        Type::I8 | Type::I16 | Type::I32 | Type::I64 => ty,
+                        _ => self.types.intern(Type::I32),
+                    },
+                };
+                Expr { kind, ty }
+            }
+            e => panic!("infer const expr {:?}", e),
+        }
     }
 
     fn add_type_decl(&mut self, type_decl: &syntax::TypeDecl) {
@@ -610,6 +682,7 @@ pub type TypeId = usize;
 pub type ParamId = usize;
 pub type FuncId = usize;
 pub type LocalId = usize;
+pub type ConstId = usize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuncType {
@@ -683,6 +756,7 @@ pub enum ExprKind {
     Unit,
     Integer(String),
     Float(String),
+    Const(ConstId),
     Param(ParamId),
     Func(FuncId),
     Local(LocalId),

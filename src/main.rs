@@ -130,8 +130,13 @@ fn main() {
     let mut type_decls = vec![];
     let mut func_decls = vec![];
     let mut func_bodys = vec![];
+    let mut const_decls = vec![];
     while p.token != syntax::EOF {
         match p.token {
+            syntax::CONST => {
+                let const_decl = p.parse_const_decl();
+                const_decls.push(const_decl);
+            }
             syntax::TYPE => {
                 let type_decl = p.parse_type_decl();
                 type_decls.push(type_decl);
@@ -156,21 +161,36 @@ fn main() {
             }
         }
     }
+    println!("{:?}", const_decls);
     println!("{:?}", type_decls);
     println!("{:?}", func_decls);
     println!("{:?}", func_bodys);
+    let module = Module {
+        const_decls: const_decls,
+        type_decls: type_decls,
+        func_decls: func_decls,
+        func_bodys: func_bodys,
+    };
 
-    let (func_decls, func_bodys, types) = ir0::build(&type_decls, &func_decls, &func_bodys);
-    println!("{:?}", func_decls);
-    println!("{:?}", func_bodys);
-    println!("{:?}", types);
+    let module = ir0::build(&module);
+    println!("{:?}", module.func_decls);
+    println!("{:?}", module.func_bodys);
+    println!("{:?}", module.types);
+    println!("{:?}", module.consts);
 
     unsafe {
-        codegen::emit_object(&func_decls, &func_bodys, &types);
+        codegen::emit_object(&module);
     }
 
     ld("a.o", "a.out");
     let _ = fs::remove_file("a.o");
+}
+
+pub struct Module {
+    const_decls: Vec<syntax::ConstDecl>,
+    type_decls: Vec<syntax::TypeDecl>,
+    func_decls: Vec<syntax::FuncDecl>,
+    func_bodys: Vec<syntax::FuncBody>,
 }
 
 fn ld(path: &str, out: &str) {

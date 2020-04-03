@@ -12,12 +12,12 @@ macro_rules! cstr {
     })
 }
 
-pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], types: &[Type]) {
+pub unsafe fn emit_object(module: &Module2) {
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
-    let module = LLVMModuleCreateWithName(cstr!("a"));
+    let llmodule = LLVMModuleCreateWithName(cstr!("a"));
 
     let triple = LLVMGetDefaultTargetTriple();
     let mut target = MaybeUninit::uninit().assume_init();
@@ -40,32 +40,33 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
         LLVMCodeModel_LLVMCodeModelDefault,
     );
     let layout = LLVMCreateTargetDataLayout(machine);
-    LLVMSetModuleDataLayout(module, layout);
-    LLVMSetTarget(module, triple);
+    LLVMSetModuleDataLayout(llmodule, layout);
+    LLVMSetTarget(llmodule, triple);
 
     let b = LLVMCreateBuilder();
-    let type_bld = &TypeBuilder::new(types);
+    let type_bld = &TypeBuilder::new(&module.types);
+    let llconsts = &build_consts(type_bld, &module.consts);
 
     let mut llfuncs = vec![];
-    for func_decl in func_decls {
+    for func_decl in &module.func_decls {
         let lltype = type_bld.func_type(&func_decl.ty);
         let mut name = func_decl.name.deref().to_string();
         name.push('\0');
         let name = name.as_ptr() as *const i8;
-        let llfunc = LLVMAddFunction(module, name, lltype);
+        let llfunc = LLVMAddFunction(llmodule, name, lltype);
         llfuncs.push(llfunc);
     }
     let llfuncs = &llfuncs;
 
-    for func_body in func_bodys {
-        let func_decl = &func_decls[func_body.id];
-        build_func_body(b, type_bld, llfuncs, func_decl, func_body);
+    for func_body in &module.func_bodys {
+        let func_decl = &module.func_decls[func_body.id];
+        build_func_body(b, type_bld, llfuncs, llconsts, func_decl, func_body);
     }
 
-    LLVMDumpModule(module);
+    LLVMDumpModule(llmodule);
     let mut msg = ptr::null_mut();
     LLVMVerifyModule(
-        module,
+        llmodule,
         LLVMVerifierFailureAction_LLVMAbortProcessAction,
         &mut msg,
     );
@@ -76,7 +77,7 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
     let mut msg = ptr::null_mut();
     if LLVMTargetMachineEmitToFile(
         machine,
-        module,
+        llmodule,
         cstr!("a.o") as *mut i8,
         LLVMCodeGenFileType_LLVMObjectFile,
         &mut msg,
@@ -85,6 +86,45 @@ pub unsafe fn emit_object(func_decls: &[FuncDecl], func_bodys: &[FuncBody], type
         let msg = CStr::from_ptr(msg);
         println!("error emitting object file: {:?}", msg);
         error();
+    }
+}
+
+unsafe fn build_consts(
+    types: &TypeBuilder,
+    consts: &[Const]
+) -> Vec<LLVMValueRef> {
+    let mut b = ConstBuilder {
+        consts: vec![None; consts.len()],
+        types: types,
+    };
+    for (id, c) in consts.iter().enumerate() {
+        let v = b.build(c);
+        b.consts[id] = Some(v);
+    }
+    let mut consts = vec![];
+    for c in b.consts {
+        consts.push(c.unwrap());
+    }
+    consts
+}
+
+struct ConstBuilder<'a> {
+    consts: Vec<Option<LLVMValueRef>>,
+    types: &'a TypeBuilder<'a>,
+}
+
+impl<'a> ConstBuilder<'a> {
+    unsafe fn build(&mut self, c: &Const) -> LLVMValueRef {
+        match &c.expr.kind {
+            ExprKind::Integer(s) => {
+                let lltype = self.types.lltype(c.expr.ty);
+                let ptr = s.as_ptr() as *const i8;
+                let len = s.len() as u32;
+                let radix = 10;
+                LLVMConstIntOfStringAndSize(lltype, ptr, len, radix)
+            }
+            _ => panic!(),
+        }
     }
 }
 
@@ -174,6 +214,7 @@ unsafe fn build_func_body(
     b: LLVMBuilderRef,
     type_bld: &TypeBuilder,
     llfuncs: &[LLVMValueRef],
+    llconsts: &[LLVMValueRef],
     func: &FuncDecl,
     body: &FuncBody,
 ) {
@@ -199,6 +240,7 @@ unsafe fn build_func_body(
         tybld: type_bld,
 
         llfuncs: llfuncs,
+        llconsts: llconsts,
         llfunc: llfunc,
         locals: locals,
         sret: sret,
@@ -216,6 +258,7 @@ struct StmtBuilder<'a> {
     bld: LLVMBuilderRef,
     tybld: &'a TypeBuilder<'a>,
     llfuncs: &'a [LLVMValueRef],
+    llconsts: &'a [LLVMValueRef],
 
     llfunc: LLVMValueRef,
     locals: &'a [LLVMValueRef],
@@ -596,6 +639,9 @@ impl<'a> StmtBuilder<'a> {
             ExprKind::Sizeof(ty) => {
                 let lltype = self.tybld.lltype(*ty);
                 LLVMSizeOf(lltype)
+            }
+            ExprKind::Const(i) => {
+                self.llconsts[*i]
             }
             _ => panic!("expected scalar, got {:?}", e),
         }
