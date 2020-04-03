@@ -260,15 +260,12 @@ impl<'a> FuncBuilder<'a> {
                 (ExprKind::Sizeof(ty), i64)
             }
             syntax::Expr::Index(p, i) => {
-                let env = match env {
-                    Some(ty) => Some(self.module.types.intern(Type::Pointer(ty))),
-                    None => None,
-                };
-                let p = self.build_expr(p, env);
+                let p = self.build_expr(p, None);
                 let i = self.build_expr(i, None);
 
                 let ty = match self.module.types.get(p.ty) {
-                    Type::Pointer(ty) => *ty,
+                    &Type::Pointer(ty) => ty,
+                    &Type::Array(elem_ty, _) => elem_ty,
                     _ => panic!(),
                 };
                 (ExprKind::Index(p.into(), i.into()), ty)
@@ -626,6 +623,11 @@ impl ModuleBuilder {
             }
             syntax::Type::Func(_) => unimplemented!(),
             syntax::Type::Unit => self.types.intern(Type::Unit),
+            syntax::Type::Array(n, elem_ty) => {
+                let elem_ty = self.build_type(elem_ty);
+                let array_ty = Type::Array(elem_ty, *n);
+                self.types.intern(array_ty)
+            }
         }
     }
 
@@ -656,6 +658,7 @@ pub enum Type {
     Pointer(TypeId),
     Func(FuncType),
     Struct(StructType),
+    Array(TypeId, u32),
     Unit,
     Bool,
 }
@@ -663,26 +666,51 @@ pub enum Type {
 impl Type {
     pub fn kind(&self) -> TypeKind {
         match self {
-            Type::I8 | Type::I16 | Type::I32 | Type::I64 => TypeKind::Int,
-            Type::F32 | Type::F64 => TypeKind::Float,
-            Type::Struct(_) => TypeKind::Struct,
             Type::Unit => TypeKind::Unit,
-            Type::Bool => TypeKind::Bool,
-            Type::Func(_) => TypeKind::Func,
-            Type::Pointer(_) => TypeKind::Pointer,
+            Type::I8 => TypeKind::Scalar,
+            Type::I16 => TypeKind::Scalar,
+            Type::I32 => TypeKind::Scalar,
+            Type::I64 => TypeKind::Scalar,
+            Type::F32 => TypeKind::Scalar,
+            Type::F64 => TypeKind::Scalar,
+            Type::Bool => TypeKind::Scalar,
+            Type::Func(_) => TypeKind::Scalar,
+            Type::Pointer(_) => TypeKind::Scalar,
+            Type::Struct(_) => TypeKind::Aggregate,
+            Type::Array(_, _) => TypeKind::Aggregate,
+        }
+    }
+
+    pub fn scalar_kind(&self) -> ScalarKind {
+        match self {
+            Type::Unit => panic!(),
+            Type::I8 => ScalarKind::Int,
+            Type::I16 => ScalarKind::Int,
+            Type::I32 => ScalarKind::Int,
+            Type::I64 => ScalarKind::Int,
+            Type::Bool => ScalarKind::Int,
+            Type::F32 => ScalarKind::Float,
+            Type::F64 => ScalarKind::Float,
+            Type::Func(_) => ScalarKind::Pointer,
+            Type::Pointer(_) => ScalarKind::Pointer,
+            Type::Struct(_) => panic!(),
+            Type::Array(_, _) => panic!(),
         }
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum TypeKind {
-    Int,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ScalarKind {
     Float,
+    Int,
     Pointer,
-    Struct,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TypeKind {
+    Aggregate,
     Unit,
-    Bool,
-    Func,
+    Scalar,
 }
 
 #[derive(Debug, Clone, PartialEq)]

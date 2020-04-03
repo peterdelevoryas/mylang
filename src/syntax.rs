@@ -58,6 +58,7 @@ pub enum Type {
     Name(String),
     Pointer(Box<Type>),
     Func(Box<FuncType>),
+    Array(u32, Box<Type>),
 }
 
 #[derive(Debug, Clone)]
@@ -670,6 +671,25 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         match self.token {
+            LBRACKET => {
+                self.next();
+                let s = self.token_string();
+                let i = self.start;
+                let j = self.end;
+                self.parse(INTEGER);
+                let n: u32 = match s.parse() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        print_cursor(self.text, i, j);
+                        println!("unable to parse array element count: {}", e);
+                        error();
+                    }
+                };
+                self.parse(RBRACKET);
+                let elem_ty = self.parse_type();
+
+                Type::Array(n, elem_ty.into())
+            }
             NAME => {
                 let name = self.token_string();
                 self.next();

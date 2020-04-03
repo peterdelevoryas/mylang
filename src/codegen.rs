@@ -169,6 +169,10 @@ impl<'a> TypeBuilder<'a> {
                 }
                 LLVMStructType(elem_types.as_mut_ptr(), elem_types.len() as u32, 0)
             }
+            Type::Array(elem_ty, n) => {
+                let elem_ty = self.build_type(*elem_ty);
+                LLVMArrayType(elem_ty, *n)
+            }
         }
     }
 
@@ -183,13 +187,13 @@ impl<'a> TypeBuilder<'a> {
     unsafe fn func_type(&self, func: &FuncType) -> LLVMTypeRef {
         let mut params = vec![];
         for &ty in &func.params {
-            let ty = match self.irtype(ty) {
-                Type::Struct(_) => {
+            let ty = match self.irtype(ty).kind() {
+                TypeKind::Aggregate => {
                     let sty = self.lltype(ty);
                     LLVMPointerType(sty, 0)
                 }
-                Type::Unit => continue,
-                _ => self.lltype(ty),
+                TypeKind::Unit => continue,
+                TypeKind::Scalar => self.lltype(ty),
             };
             params.push(ty);
         }
@@ -355,11 +359,20 @@ impl<'a> StmtBuilder<'a> {
 
     unsafe fn build_place(&mut self, e: &Expr) -> LLVMValueRef {
         match &e.kind {
-            ExprKind::Local(i) => self.locals[*i],
+            &ExprKind::Local(i) => self.locals[i],
+            &ExprKind::Param(i) => LLVMGetParam(self.llfunc, i as u32),
             ExprKind::Index(p, i) => {
                 let ptr = self.tybld.lltype(p.ty);
                 let elem = LLVMGetElementType(ptr);
-                let p = self.build_scalar(p);
+                let ty = self.tybld.irtype(p.ty);
+                let p = match self.tybld.irtype(p.ty).kind() {
+                    TypeKind::Aggregate => self.build_place(p),
+                    TypeKind::Scalar => {
+                        assert_eq!(ty.scalar_kind(), ScalarKind::Pointer);
+                        self.build_scalar(p)
+                    }
+                    TypeKind::Unit => panic!(),
+                };
                 let i = self.build_scalar(i);
                 let mut idx = [i];
                 let pidx = idx.as_mut_ptr();
@@ -381,12 +394,6 @@ impl<'a> StmtBuilder<'a> {
                     }
                     _ => panic!(),
                 }
-            }
-            ExprKind::Param(i) => {
-                let ty = self.tybld.lltype(e.ty);
-                let kind = LLVMGetTypeKind(ty);
-                assert_eq!(kind, LLVMTypeKind_LLVMStructTypeKind);
-                LLVMGetParam(self.llfunc, *i as u32)
             }
             ExprKind::Unary(Unop::Deref, p) => self.build_scalar(p),
             k => unimplemented!("build place {:?}", k),
@@ -531,11 +538,11 @@ impl<'a> StmtBuilder<'a> {
             }
             ExprKind::Binary(op, x, y) => {
                 let irty = self.tybld.irtype(x.ty);
-                let kind = irty.kind();
+                let kind = irty.scalar_kind();
                 let x = self.build_scalar(x);
                 let y = self.build_scalar(y);
                 use Predicate::*;
-                use TypeKind::*;
+                use ScalarKind::*;
                 match (op, kind) {
                     (Binop::Add, Int) => LLVMBuildAdd(self.bld, x, y, cstr!("")),
                     (Binop::Sub, Int) => LLVMBuildSub(self.bld, x, y, cstr!("")),

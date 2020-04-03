@@ -12,6 +12,20 @@ type dirent struct {
     d_type: uchar,
 }
 
+fn mod(a: i32, n: i32) -> i32 {
+    return a - n * (a / n);
+}
+
 fn main() {
-    let x: i32;
+    let x: [256]i8;
+    for let i = 0; i < 256; i += 1 {
+        x[i] = i as i8;
+    }
+    for let i = 0; i < 256; i += 1 {
+        if mod(i, 16) == 0 {
+            printf("\n");
+        }
+        printf("0x%02x ", x[i]);
+    }
+    printf("\n");
 }

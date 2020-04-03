@@ -175,6 +175,12 @@ fn main() {
     let module = ir0::build(&module);
     println!("{:?}", module.func_decls);
     println!("{:?}", module.func_bodys);
+    for body in &module.func_bodys {
+        println!("func {:?} locals {:?}", body.id, body.locals);
+        for stmt in &body.body.stmts {
+            println!("{:?}", stmt);
+        }
+    }
     println!("{:?}", module.types);
     println!("{:?}", module.consts);
 
