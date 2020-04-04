@@ -349,9 +349,7 @@ impl<'a> StmtBuilder<'a> {
                 self.build_block(body);
                 self.break_dest.pop();
                 self.continue_dest.pop();
-                if LLVMGetBasicBlockTerminator(then).is_null() {
-                    LLVMBuildBr(self.bld, tail);
-                }
+                LLVMBuildBr(self.bld, tail);
 
                 self.position_at_end(tail);
                 self.build_stmt(post);
