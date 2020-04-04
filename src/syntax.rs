@@ -42,6 +42,7 @@ pub enum Token {
     INTEGER,
     FLOAT,
     STRING,
+    CHAR,
     PLUS,
     MINUS,
     ELLIPSIS,
@@ -145,6 +146,7 @@ pub enum Expr {
     Cast(Box<Expr>, Type),
     Bool(bool),
     Sizeof(Type),
+    Char(u8),
     Null,
 }
 
@@ -204,23 +206,29 @@ impl<'a> Parser<'a> {
             ':' => (COLON, 1),
             '.' if d == '.' && e == '.' => (ELLIPSIS, 3),
             '.' => (DOT, 1),
-            '"' => {
+            '"' | '\'' => {
+                let quote = c as u8;
                 let mut escaped = false;
                 let mut n = 1;
-                for b in &text[1..] {
-                    if !escaped && *b == b'"' {
+                for &b in &text[1..] {
+                    if !escaped && b == quote {
                         break;
                     }
-                    escaped = !escaped && *b == b'\\';
+                    escaped = !escaped && b == b'\\';
                     n += 1;
                 }
-                if text.get(n) != Some(&b'"') {
+                if text.get(n) != Some(&quote) {
                     print_cursor(self.text, self.start, self.start + 1);
-                    println!("unterminated string literal");
+                    println!("unterminated literal");
                     error();
                 }
                 n += 1;
-                (STRING, n)
+                let t = match quote {
+                    b'"' => STRING,
+                    b'\'' => CHAR,
+                    _ => unreachable!(),
+                };
+                (t, n)
             }
             _ if c.is_ascii_alphabetic() || c == '_' => {
                 let mut n = 0;
@@ -612,6 +620,21 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            CHAR => {
+                let s = self.token_string();
+                let s = s.as_bytes();
+                self.next();
+                let c = match s[1] {
+                    b'\\' => match s[2] {
+                        b'n' => b'\n',
+                        b't' => b'\t',
+                        b'r' => b'\r',
+                        c => c,
+                    },
+                    c => c,
+                };
+                Expr::Char(c)
+            }
             NULL => {
                 self.next();
                 Expr::Null

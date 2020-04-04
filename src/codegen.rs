@@ -731,6 +731,10 @@ impl<'a> StmtBuilder<'a> {
                 let lltype = self.tybld.lltype(e.ty);
                 LLVMConstPointerNull(lltype)
             }
+            &ExprKind::Char(c) => {
+                let lltype = self.tybld.lltype(e.ty);
+                LLVMConstInt(lltype, c as u64, 0)
+            }
             _ => panic!("expected scalar, got {:?}", e),
         }
     }

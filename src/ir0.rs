@@ -256,6 +256,10 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            &syntax::Expr::Char(c) => {
+                let i8 = self.module.types.intern(Type::I8);
+                (ExprKind::Char(c), i8)
+            }
             syntax::Expr::Null => {
                 let ty = match env {
                     Some(ty) => ty,
@@ -843,5 +847,6 @@ pub enum ExprKind {
     MethodCall(FuncId, Box<Expr>),
     Cast(Box<Expr>, TypeId),
     Bool(bool),
+    Char(u8),
     Sizeof(TypeId),
 }
