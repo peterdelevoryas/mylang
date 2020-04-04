@@ -5,6 +5,9 @@ use crate::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    BREAK,
+    CONTINUE,
+    NULL,
     CONST,
     SIZEOF,
     PLUSEQ,
@@ -122,6 +125,8 @@ pub enum Stmt {
     Assign(Expr, Expr),
     For(Box<Stmt>, Expr, Box<Stmt>, Block),
     OpAssign(Token, Expr, Expr),
+    Break,
+    Continue,
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +145,7 @@ pub enum Expr {
     Cast(Box<Expr>, Type),
     Bool(bool),
     Sizeof(Type),
+    Null,
 }
 
 pub struct Parser<'a> {
@@ -226,6 +232,9 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"break" => BREAK,
+                    b"continue" => CONTINUE,
+                    b"null" => NULL,
                     b"const" => CONST,
                     b"sizeof" => SIZEOF,
                     b"for" => FOR,
@@ -415,6 +424,14 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.token {
+            BREAK => {
+                self.next();
+                Stmt::Break
+            }
+            CONTINUE => {
+                self.next();
+                Stmt::Continue
+            }
             FOR => {
                 self.next();
                 let init = self.parse_stmt();
@@ -509,7 +526,7 @@ impl<'a> Parser<'a> {
             let op = self.token;
             let i = precedence(op);
             self.next();
-            let mut rhs = self.parse_as();
+            let mut rhs = self.parse_unary();
             while precedence(self.token) > i {
                 let j = precedence(self.token);
                 rhs = self.parse_binary(rhs, j);
@@ -595,6 +612,10 @@ impl<'a> Parser<'a> {
 
     fn parse_atom(&mut self) -> Expr {
         match self.token {
+            NULL => {
+                self.next();
+                Expr::Null
+            }
             SIZEOF => {
                 self.next();
                 self.parse(LPARENS);

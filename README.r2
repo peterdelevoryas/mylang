@@ -1,31 +1,34 @@
-fn printf(fmt: *i8, ...);
+fn printf(fmt: *i8, ...) -> i32;
+fn opendir(filename: *i8) -> *DIR;
+fn strlen(s: *i8) -> i64;
+fn sprintf(s: *i8, fmt: *i8, ...) -> i32;
+fn readdir(dirp: *DIR) -> *dirent;
 
-type ino_t = i64;
-type off_t = i64;
-type ushort = i16;
-type uchar = i8;
-
+type DIR struct {}
 type dirent struct {
-    d_ino: ino_t,
-    d_off: off_t,
-    d_reclen: ushort,
-    d_type: uchar,
+    d_ino: i64,
+    d_seekoff: i64,
+    d_reclen: i16,
+    d_namlen: i16,
+    d_type: i8,
+    d_name: [1024]i8,
 }
 
-fn mod(a: i32, n: i32) -> i32 {
-    return a - n * (a / n);
+fn print(entry: *dirent) {
+    let d_name = &entry.d_name[0];
+    printf("d_name = %p, %s\n", d_name, d_name);
 }
 
-fn main() {
-    let x: [256]i8;
-    for let i = 0; i < 256; i += 1 {
-        x[i] = i as i8;
+fn main() -> i32 {
+    let dir = opendir(".");
+    if dir == null {
+        printf("unable to open current directory\n");
+        return 1;
     }
-    for let i = 0; i < 256; i += 1 {
-        if mod(i, 16) == 0 {
-            printf("\n");
-        }
-        printf("0x%02x ", x[i]);
+
+    for let entry = readdir(dir); entry != null; entry = readdir(dir) {
+        printf("%s\n", &entry.d_name[0]);
     }
-    printf("\n");
+
+    return 0;
 }

@@ -52,8 +52,12 @@ pub unsafe fn emit_object(module: &Module2) {
         let lltype = type_bld.func_type(&func_decl.ty);
         let mut name = func_decl.name.deref().to_string();
         name.push('\0');
-        let name = name.as_ptr() as *const i8;
-        let llfunc = LLVMAddFunction(llmodule, name, lltype);
+        let mut link_name = name.as_ptr() as *const i8;
+        if cfg!(target_os = "macos") && name == "readdir\0" {
+            link_name = "readdir$INODE64\0".as_ptr() as *const i8;
+        }
+        println!("link name {:?}", name);
+        let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
         llfuncs.push(llfunc);
     }
     let llfuncs = &llfuncs;
@@ -143,10 +147,19 @@ impl<'a> TypeBuilder<'a> {
             let lltype = b.build_type(type_id);
             b.lltypes.push(lltype);
         }
+        for (id, ty) in types.iter().enumerate() {
+            if let Type::Struct(sty) = ty {
+                println!("create struct body {:?}", sty.name);
+                b.set_struct_body(id, sty);
+            }
+        }
         b
     }
 
     unsafe fn build_type(&self, ty: TypeId) -> LLVMTypeRef {
+        if let Some(&lltype) = self.lltypes.get(ty) {
+            return lltype;
+        }
         match self.irtype(ty) {
             Type::Bool => LLVMInt1Type(),
             Type::I8 => LLVMInt8Type(),
@@ -162,18 +175,25 @@ impl<'a> TypeBuilder<'a> {
             Type::Func(ty) => self.func_type(ty),
             Type::Unit => LLVMVoidType(),
             Type::Struct(ty) => {
-                let mut elem_types = vec![];
-                for (_, ty) in &ty.fields {
-                    let ty = self.build_type(*ty);
-                    elem_types.push(ty);
-                }
-                LLVMStructType(elem_types.as_mut_ptr(), elem_types.len() as u32, 0)
+                let mut name = ty.name.to_string();
+                name.push('\0');
+                LLVMStructCreateNamed(LLVMGetGlobalContext(), name.as_ptr() as *const i8)
             }
             Type::Array(elem_ty, n) => {
                 let elem_ty = self.build_type(*elem_ty);
                 LLVMArrayType(elem_ty, *n)
             }
         }
+    }
+
+    unsafe fn set_struct_body(&self, id: TypeId, sty: &StructType) {
+        let lltype = self.lltype(id);
+        let mut elem_types = vec![];
+        for &(_, ty) in &sty.fields {
+            let ty = self.lltype(ty);
+            elem_types.push(ty);
+        }
+        LLVMStructSetBody(lltype, elem_types.as_mut_ptr(), elem_types.len() as u32, 0);
     }
 
     fn irtype(&self, ty: TypeId) -> &'a Type {
@@ -248,6 +268,9 @@ unsafe fn build_func_body(
         llfunc: llfunc,
         locals: locals,
         sret: sret,
+
+        break_dest: vec![],
+        continue_dest: vec![],
         block: entry,
     };
     b.build_block(&body.body);
@@ -268,6 +291,8 @@ struct StmtBuilder<'a> {
     locals: &'a [LLVMValueRef],
     sret: Option<LLVMValueRef>,
 
+    break_dest: Vec<LLVMBasicBlockRef>,
+    continue_dest: Vec<LLVMBasicBlockRef>,
     block: LLVMBasicBlockRef,
 }
 
@@ -275,7 +300,7 @@ struct StmtBuilder<'a> {
 enum Value {
     Unit,
     Scalar(LLVMValueRef),
-    Struct(LLVMValueRef),
+    Aggregate(LLVMValueRef),
 }
 
 impl<'a> StmtBuilder<'a> {
@@ -285,8 +310,27 @@ impl<'a> StmtBuilder<'a> {
         }
     }
 
+    unsafe fn position_at_end(&mut self, block: LLVMBasicBlockRef) {
+        LLVMPositionBuilderAtEnd(self.bld, block);
+        self.block = block;
+    }
+
     unsafe fn build_stmt(&mut self, stmt: &Stmt) {
         match stmt {
+            Stmt::Break => {
+                let block = match self.break_dest.last() {
+                    Some(&b) => b,
+                    None => panic!("can't break outside of loop"),
+                };
+                LLVMBuildBr(self.bld, block);
+            }
+            Stmt::Continue => {
+                let block = match self.continue_dest.last() {
+                    Some(&b) => b,
+                    None => panic!("can't continue outside of loop"),
+                };
+                LLVMBuildBr(self.bld, block);
+            }
             Stmt::For(init, cond, post, body) => {
                 self.build_stmt(init);
                 let head = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
@@ -294,36 +338,48 @@ impl<'a> StmtBuilder<'a> {
                 let tail = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let done = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 LLVMBuildBr(self.bld, head);
-                LLVMPositionBuilderAtEnd(self.bld, head);
-                self.block = head;
+
+                self.position_at_end(head);
                 let cond = self.build_scalar(cond);
                 LLVMBuildCondBr(self.bld, cond, then, done);
-                LLVMPositionBuilderAtEnd(self.bld, then);
-                self.block = then;
+
+                self.position_at_end(then);
+                self.break_dest.push(done);
+                self.continue_dest.push(tail);
                 self.build_block(body);
-                LLVMBuildBr(self.bld, tail);
-                LLVMPositionBuilderAtEnd(self.bld, tail);
-                self.block = tail;
+                self.break_dest.pop();
+                self.continue_dest.pop();
+                if LLVMGetBasicBlockTerminator(then).is_null() {
+                    LLVMBuildBr(self.bld, tail);
+                }
+
+                self.position_at_end(tail);
                 self.build_stmt(post);
                 LLVMBuildBr(self.bld, head);
-                LLVMPositionBuilderAtEnd(self.bld, done);
-                self.block = done;
+
+                self.position_at_end(done);
             }
             Stmt::While(cond, body) => {
                 let head = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let then = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let done = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 LLVMBuildBr(self.bld, head);
-                LLVMPositionBuilderAtEnd(self.bld, head);
-                self.block = head;
+
+                self.position_at_end(head);
                 let cond = self.build_scalar(cond);
                 LLVMBuildCondBr(self.bld, cond, then, done);
-                LLVMPositionBuilderAtEnd(self.bld, then);
-                self.block = then;
+
+                self.position_at_end(then);
+                self.break_dest.push(done);
+                self.continue_dest.push(head);
                 self.build_block(body);
-                LLVMBuildBr(self.bld, head);
-                LLVMPositionBuilderAtEnd(self.bld, done);
-                self.block = done;
+                self.break_dest.pop();
+                self.continue_dest.pop();
+                if LLVMGetBasicBlockTerminator(then).is_null() {
+                    LLVMBuildBr(self.bld, head);
+                }
+
+                self.position_at_end(done);
             }
             Stmt::If(cond, body) => {
                 let cond = self.build_scalar(cond);
@@ -347,7 +403,7 @@ impl<'a> StmtBuilder<'a> {
                 let v = self.build_expr(x, self.sret);
                 match v {
                     Value::Unit => LLVMBuildRetVoid(self.bld),
-                    Value::Struct(_) => LLVMBuildRetVoid(self.bld),
+                    Value::Aggregate(_) => LLVMBuildRetVoid(self.bld),
                     Value::Scalar(v) => LLVMBuildRet(self.bld, v),
                 };
             }
@@ -401,12 +457,12 @@ impl<'a> StmtBuilder<'a> {
     }
 
     unsafe fn build_expr(&mut self, e: &Expr, dst: Option<LLVMValueRef>) -> Value {
-        match self.tybld.irtype(e.ty) {
-            Type::Unit => {
+        match self.tybld.irtype(e.ty).kind() {
+            TypeKind::Unit => {
                 self.build_unit(e);
                 Value::Unit
             }
-            Type::Struct(_) => {
+            TypeKind::Aggregate => {
                 let p = match dst {
                     Some(p) => p,
                     None => {
@@ -414,10 +470,10 @@ impl<'a> StmtBuilder<'a> {
                         LLVMBuildAlloca(self.bld, sty, cstr!(""))
                     }
                 };
-                self.build_struct(e, p);
-                Value::Struct(p)
+                self.build_aggregate(e, p);
+                Value::Aggregate(p)
             }
-            _ => {
+            TypeKind::Scalar => {
                 let v = self.build_scalar(e);
                 if let Some(dst) = dst {
                     LLVMBuildStore(self.bld, v, dst);
@@ -435,7 +491,7 @@ impl<'a> StmtBuilder<'a> {
             let arg = self.build_expr(arg, None);
             let arg = match arg {
                 Value::Unit => continue,
-                Value::Struct(p) => p,
+                Value::Aggregate(p) => p,
                 Value::Scalar(v) => v,
             };
             args2.push(arg);
@@ -456,7 +512,7 @@ impl<'a> StmtBuilder<'a> {
         }
     }
 
-    unsafe fn build_struct(&mut self, e: &Expr, dst: LLVMValueRef) {
+    unsafe fn build_aggregate(&mut self, e: &Expr, dst: LLVMValueRef) {
         match &e.kind {
             ExprKind::Struct(fields) => {
                 let sty = self.tybld.lltype(e.ty);
@@ -486,6 +542,20 @@ impl<'a> StmtBuilder<'a> {
     }
 
     unsafe fn copy(&mut self, ty: TypeId, src: LLVMValueRef, dst: LLVMValueRef) {
+        let irty = self.tybld.irtype(ty);
+        match irty.kind() {
+            TypeKind::Unit => {}
+            TypeKind::Aggregate => {
+                let lltype = self.tybld.lltype(ty);
+                let v = LLVMBuildLoad2(self.bld, lltype, src, cstr!(""));
+                LLVMBuildStore(self.bld, v, dst);
+            }
+            TypeKind::Scalar => {
+                let lltype = self.tybld.lltype(ty);
+                let v = LLVMBuildLoad2(self.bld, lltype, src, cstr!(""));
+                LLVMBuildStore(self.bld, v, dst);
+            }
+        }
         match self.tybld.irtype(ty) {
             Type::Unit => {}
             Type::Struct(sty) => {
@@ -563,6 +633,10 @@ impl<'a> StmtBuilder<'a> {
                         LLVMBuildGEP2(self.bld, elem, x, pidx, nidx, cstr!(""))
                     }
 
+                    (Binop::Sub, Pointer) => {
+                        LLVMBuildPtrDiff(self.bld, x, y, cstr!(""))
+                    }
+
                     (Binop::Cmp(pred), _) => {
                         let pred = match (pred, kind) {
                             (Eq, Float) => LLVMRealPredicate_LLVMRealOEQ,
@@ -579,12 +653,17 @@ impl<'a> StmtBuilder<'a> {
                             (Gt, Int) => LLVMIntPredicate_LLVMIntSGT,
                             (Lt, Int) => LLVMIntPredicate_LLVMIntSLT,
 
-                            (pred, kind) => unimplemented!("{:?} {:?}", pred, kind),
+                            (Eq, Pointer) => LLVMIntPredicate_LLVMIntEQ,
+                            (Ne, Pointer) => LLVMIntPredicate_LLVMIntNE,
+                            (Ge, Pointer) => LLVMIntPredicate_LLVMIntSGE,
+                            (Le, Pointer) => LLVMIntPredicate_LLVMIntSLE,
+                            (Gt, Pointer) => LLVMIntPredicate_LLVMIntSGT,
+                            (Lt, Pointer) => LLVMIntPredicate_LLVMIntSLT,
                         };
                         let cmp = match kind {
                             Float => LLVMBuildFCmp,
                             Int => LLVMBuildICmp,
-                            _ => panic!(),
+                            Pointer => LLVMBuildICmp,
                         };
                         cmp(self.bld, pred, x, y, cstr!(""))
                     }
@@ -649,6 +728,10 @@ impl<'a> StmtBuilder<'a> {
             }
             ExprKind::Const(i) => {
                 self.llconsts[*i]
+            }
+            ExprKind::Null => {
+                let lltype = self.tybld.lltype(e.ty);
+                LLVMConstPointerNull(lltype)
             }
             _ => panic!("expected scalar, got {:?}", e),
         }

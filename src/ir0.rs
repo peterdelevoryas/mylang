@@ -169,6 +169,8 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Stmt {
         match stmt {
+            syntax::Stmt::Break => Stmt::Break,
+            syntax::Stmt::Continue => Stmt::Continue,
             syntax::Stmt::For(init, cond, post, body) => {
                 let scope = self.module.names.enter_scope();
                 let init = self.build_stmt(init);
@@ -254,6 +256,17 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match e {
+            syntax::Expr::Null => {
+                let ty = match env {
+                    Some(ty) => ty,
+                    None => panic!("cannot infer type of null"),
+                };
+                match self.module.types.get(ty) {
+                    Type::Pointer(_) => {},
+                    ty => panic!("expected {:?}, got null", ty),
+                };
+                (ExprKind::Null, ty)
+            }
             syntax::Expr::Sizeof(ty) => {
                 let ty = self.module.build_type(ty);
                 let i64 = self.module.types.intern(Type::I64);
@@ -446,9 +459,14 @@ impl<'a> FuncBuilder<'a> {
                     _ => panic!(),
                 };
                 let x = self.build_expr(x, None);
-                let y_ty = match self.module.types.get(x.ty) {
-                    Type::Pointer(_) => self.module.types.intern(Type::I32),
-                    _ => x.ty,
+                let i32 = self.module.types.intern(Type::I32);
+                let x_ty = self.module.types.get(x.ty);
+                let y_ty = match (x_ty.scalar_kind(), op) {
+                    (ScalarKind::Pointer, Binop::Add) => i32,
+                    (ScalarKind::Pointer, Binop::Sub) => x.ty,
+                    (ScalarKind::Pointer, Binop::Cmp(_)) => x.ty,
+                    (ScalarKind::Pointer, op) => panic!("pointer not allowed in {:?} expr", op),
+                     _ => x.ty,
                 };
                 let y = self.build_expr(y, Some(y_ty));
                 let ty = match op {
@@ -615,7 +633,7 @@ impl ModuleBuilder {
         match ty {
             syntax::Type::Name(name) => match self.names.get(*name) {
                 Some(Def::Type(i)) => i,
-                x => panic!("building type: name def = {:?}", x),
+                x => panic!("building type: {:?} def = {:?}", name, x),
             },
             syntax::Type::Pointer(ty) => {
                 let ty = self.build_type(ty);
@@ -770,6 +788,8 @@ pub enum Stmt {
     If(Expr, Block),
     While(Expr, Block),
     For(Box<Stmt>, Expr, Box<Stmt>, Block),
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]
@@ -805,6 +825,7 @@ pub enum Binop {
 
 #[derive(Debug)]
 pub enum ExprKind {
+    Null,
     Unit,
     Integer(String),
     Float(String),
