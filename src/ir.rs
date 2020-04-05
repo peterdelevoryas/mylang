@@ -184,7 +184,7 @@ impl<'a> FuncBuilder<'a> {
             syntax::Stmt::OpAssign(op, x, y) => {
                 let x2 = Box::new((*x).clone());
                 let y2 = Box::new((*y).clone());
-                let rhs = syntax::Expr::Binary(*op, x2, y2);
+                let rhs = syntax::Expr { kind: syntax::ExprKind::Binary(*op, x2, y2) };
                 let lhs = self.build_expr(x, None);
                 let rhs = self.build_expr(&rhs, Some(lhs.ty));
                 Stmt::Assign(lhs, rhs)
@@ -255,12 +255,12 @@ impl<'a> FuncBuilder<'a> {
     }
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
-        let (kind, ty) = match e {
-            &syntax::Expr::Char(c) => {
+        let (kind, ty) = match &e.kind {
+            &syntax::ExprKind::Char(c) => {
                 let i8 = self.module.types.intern(Type::I8);
                 (ExprKind::Char(c), i8)
             }
-            syntax::Expr::Null => {
+            syntax::ExprKind::Null => {
                 let ty = match env {
                     Some(ty) => ty,
                     None => panic!("cannot infer type of null"),
@@ -271,12 +271,12 @@ impl<'a> FuncBuilder<'a> {
                 };
                 (ExprKind::Null, ty)
             }
-            syntax::Expr::Sizeof(ty) => {
+            syntax::ExprKind::Sizeof(ty) => {
                 let ty = self.module.build_type(ty);
                 let i64 = self.module.types.intern(Type::I64);
                 (ExprKind::Sizeof(ty), i64)
             }
-            syntax::Expr::Index(p, i) => {
+            syntax::ExprKind::Index(p, i) => {
                 let p = self.build_expr(p, None);
                 let i = self.build_expr(i, None);
 
@@ -287,7 +287,7 @@ impl<'a> FuncBuilder<'a> {
                 };
                 (ExprKind::Index(p.into(), i.into()), ty)
             }
-            syntax::Expr::Unary(op, e) => match op {
+            syntax::ExprKind::Unary(op, e) => match op {
                 syntax::AMPERSAND => {
                     let env = match env {
                         Some(ty) => match self.module.types.get(ty) {
@@ -314,16 +314,16 @@ impl<'a> FuncBuilder<'a> {
                 }
                 op => unimplemented!("unary operator {:?}", op),
             }
-            syntax::Expr::Bool(b) => {
+            syntax::ExprKind::Bool(b) => {
                 let bool = self.module.types.intern(Type::Bool);
                 (ExprKind::Bool(*b), bool)
             }
-            syntax::Expr::Cast(e, ty) => {
+            syntax::ExprKind::Cast(e, ty) => {
                 let e = self.build_expr(e, None);
                 let ty = self.module.build_type(ty);
                 (ExprKind::Cast(e.into(), ty), ty)
             }
-            syntax::Expr::Field(e, field_name) => {
+            syntax::ExprKind::Field(e, field_name) => {
                 let e = self.build_expr(e, None);
                 let sty = match self.module.types.auto_deref(e.ty) {
                     Type::Struct(sty) => sty,
@@ -358,7 +358,7 @@ impl<'a> FuncBuilder<'a> {
                     }
                 }
             }
-            syntax::Expr::Struct(fields) => {
+            syntax::ExprKind::Struct(fields) => {
                 let ty = match env {
                     None => panic!(),
                     Some(ty) => self.module.types.get(ty),
@@ -379,7 +379,7 @@ impl<'a> FuncBuilder<'a> {
                     self.module.types.intern(Type::Struct(sty)),
                 )
             }
-            syntax::Expr::Array(elems) => {
+            syntax::ExprKind::Array(elems) => {
                 let (elem_ty, n) = match env {
                     None => (None, None),
                     Some(ty) => match self.module.types.get(ty) {
@@ -409,8 +409,8 @@ impl<'a> FuncBuilder<'a> {
                 let array_ty = self.module.types.intern(array_ty);
                 (ExprKind::Array(elems2), array_ty)
             }
-            syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
-            syntax::Expr::Call(func, args) => {
+            syntax::ExprKind::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
+            syntax::ExprKind::Call(func, args) => {
                 let mut func = self.build_expr(func, None);
                 let mut args2 = vec![];
                 func = match func.kind {
@@ -473,12 +473,12 @@ impl<'a> FuncBuilder<'a> {
 
                 (ExprKind::Call(func.into(), args), fnty.ret)
             }
-            syntax::Expr::String(s) => {
+            syntax::ExprKind::String(s) => {
                 let i8 = self.module.types.intern(Type::I8);
                 let ptr_i8 = self.module.types.intern(Type::Pointer(i8));
                 (ExprKind::String(*s), ptr_i8)
             }
-            syntax::Expr::Binary(op, x, y) => {
+            syntax::ExprKind::Binary(op, x, y) => {
                 let op = match op {
                     syntax::PLUS => Binop::Add,
                     syntax::MINUS => Binop::Sub,
@@ -509,7 +509,7 @@ impl<'a> FuncBuilder<'a> {
                 };
                 (ExprKind::Binary(op, x.into(), y.into()), ty)
             }
-            syntax::Expr::Float(s) => {
+            syntax::ExprKind::Float(s) => {
                 let f32 = self.module.types.intern(Type::F32);
                 let ty = match env {
                     Some(ty) => match self.module.types.get(ty) {
@@ -520,7 +520,7 @@ impl<'a> FuncBuilder<'a> {
                 };
                 (ExprKind::Float(*s), ty)
             }
-            syntax::Expr::Integer(s) => {
+            syntax::ExprKind::Integer(s) => {
                 let ty = match env {
                     None => self.module.types.intern(Type::I32),
                     Some(ty) => match self.module.types.get(ty) {
@@ -530,7 +530,7 @@ impl<'a> FuncBuilder<'a> {
                 };
                 (ExprKind::Integer(*s), ty)
             }
-            syntax::Expr::Name(name) => match self.module.names.get(*name) {
+            syntax::ExprKind::Name(name) => match self.module.names.get(*name) {
                 None => {
                     println!("undefined symbol {:?}", name);
                     error();
@@ -615,8 +615,8 @@ impl ModuleBuilder {
     }
 
     fn infer_const_expr(&mut self, e: &syntax::Expr, ty: Option<TypeId>) -> Expr {
-        match e {
-            syntax::Expr::Integer(s) => {
+        match &e.kind {
+            syntax::ExprKind::Integer(s) => {
                 let kind = ExprKind::Integer(*s);
                 let ty = match ty {
                     None => self.types.intern(Type::I32),

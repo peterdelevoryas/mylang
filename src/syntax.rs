@@ -131,7 +131,12 @@ pub enum Stmt {
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprKind {
     Unit,
     Integer(String),
     Float(String),
@@ -491,7 +496,7 @@ impl<'a> Parser<'a> {
             RETURN => {
                 self.next();
                 let e = match self.token {
-                    SEMICOLON => Expr::Unit,
+                    SEMICOLON => Expr { kind: ExprKind::Unit },
                     _ => self.parse_expr(),
                 };
                 Stmt::Return(e)
@@ -541,7 +546,7 @@ impl<'a> Parser<'a> {
                 rhs = self.parse_binary(rhs, j);
             }
 
-            lhs = Expr::Binary(op, lhs.into(), rhs.into());
+            lhs = Expr { kind: ExprKind::Binary(op, lhs.into(), rhs.into()), };
         }
 
         lhs
@@ -557,7 +562,7 @@ impl<'a> Parser<'a> {
         while self.token == AS {
             self.next();
             let ty = self.parse_type();
-            x = Expr::Cast(x.into(), ty);
+            x = Expr { kind: ExprKind::Cast(x.into(), ty), };
         }
         x
     }
@@ -568,7 +573,7 @@ impl<'a> Parser<'a> {
                 let op = self.token;
                 self.next();
                 let e = self.parse_unary();
-                Expr::Unary(op, e.into())
+                Expr { kind: ExprKind::Unary(op, e.into()), }
             }
             _ => self.parse_as(),
         }
@@ -581,7 +586,7 @@ impl<'a> Parser<'a> {
             let i = self.parse_expr();
             self.parse(RBRACKET);
 
-            x = Expr::Index(x.into(), i.into());
+            x = Expr { kind: ExprKind::Index(x.into(), i.into()), };
         }
         x
     }
@@ -592,7 +597,7 @@ impl<'a> Parser<'a> {
             self.next();
             let field_name = self.token_string();
             self.parse(NAME);
-            e = Expr::Field(e.into(), field_name);
+            e = Expr { kind: ExprKind::Field(e.into(), field_name), };
         }
         e
     }
@@ -614,7 +619,7 @@ impl<'a> Parser<'a> {
             }
             self.parse(RPARENS);
 
-            x = Expr::Call(x.into(), args);
+            x = Expr { kind: ExprKind::Call(x.into(), args), };
         }
         x
     }
@@ -634,18 +639,18 @@ impl<'a> Parser<'a> {
                     },
                     c => c,
                 };
-                Expr::Char(c)
+                Expr { kind: ExprKind::Char(c), }
             }
             NULL => {
                 self.next();
-                Expr::Null
+                Expr { kind: ExprKind::Null, }
             }
             SIZEOF => {
                 self.next();
                 self.parse(LPARENS);
                 let ty = self.parse_type();
                 self.parse(RPARENS);
-                Expr::Sizeof(ty)
+                Expr { kind: ExprKind::Sizeof(ty), }
             }
             LBRACE => {
                 self.next();
@@ -663,7 +668,7 @@ impl<'a> Parser<'a> {
                     self.next();
                 }
                 self.parse(RBRACE);
-                Expr::Struct(fields)
+                Expr { kind: ExprKind::Struct(fields), }
             }
             LBRACKET => {
                 self.next();
@@ -677,7 +682,7 @@ impl<'a> Parser<'a> {
                     self.next();
                 }
                 self.parse(RBRACKET);
-                Expr::Array(elems)
+                Expr { kind: ExprKind::Array(elems), }
             }
             LPARENS => {
                 self.next();
@@ -689,36 +694,36 @@ impl<'a> Parser<'a> {
 
                 match e {
                     Some(e) => e,
-                    None => Expr::Unit,
+                    None => Expr { kind: ExprKind::Unit, },
                 }
             }
             TRUE => {
                 self.next();
-                Expr::Bool(true)
+                Expr { kind: ExprKind::Bool(true), }
             }
             FALSE => {
                 self.next();
-                Expr::Bool(false)
+                Expr { kind: ExprKind::Bool(false), }
             }
             STRING => {
                 let s = self.token_string();
                 self.next();
-                Expr::String(s)
+                Expr { kind: ExprKind::String(s), }
             }
             FLOAT => {
                 let s = self.token_string();
                 self.next();
-                Expr::Float(s)
+                Expr { kind: ExprKind::Float(s), }
             }
             INTEGER => {
                 let s = self.token_string();
                 self.next();
-                Expr::Integer(s)
+                Expr { kind: ExprKind::Integer(s), }
             }
             NAME => {
                 let name = self.token_string();
                 self.next();
-                Expr::Name(name)
+                Expr { kind: ExprKind::Name(name), }
             }
             _ => {
                 print_cursor(self.text, self.start, self.end);
