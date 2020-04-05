@@ -4,7 +4,8 @@ use crate::print_cursor;
 use crate::String;
 
 #[derive(Debug)]
-pub struct Module {
+pub struct Module<'a> {
+    pub text: &'a str,
     pub const_decls: Vec<ConstDecl>,
     pub type_decls: Vec<TypeDecl>,
     pub func_decls: Vec<FuncDecl>,
@@ -54,6 +55,7 @@ pub fn parse(text: &str) -> Module {
         }
     }
     Module {
+        text: text,
         const_decls: const_decls,
         type_decls: type_decls,
         func_decls: func_decls,

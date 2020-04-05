@@ -2,6 +2,7 @@ use crate::error;
 use crate::intern;
 use crate::syntax;
 use crate::String;
+use crate::print_cursor;
 
 #[derive(Debug, Default)]
 pub struct TypeIntern {
@@ -112,6 +113,7 @@ pub fn build(module: &syntax::Module) -> Module2 {
     let mut bodys = vec![];
     for func in &module.func_bodys {
         let b = FuncBuilder {
+            text: module.text,
             module: &mut b,
             body: FuncBody {
                 id: func.id,
@@ -135,6 +137,7 @@ pub fn build(module: &syntax::Module) -> Module2 {
 }
 
 struct FuncBuilder<'a> {
+    text: &'a str,
     module: &'a mut ModuleBuilder,
     body: FuncBody,
 }
@@ -564,6 +567,9 @@ impl<'a> FuncBuilder<'a> {
         };
         if let Some(env) = env {
             if ty != env {
+                let start = e.span.0 as usize;
+                let end = e.span.1 as usize;
+                print_cursor(self.text, start, end);
                 println!(
                     "expected {:?}, got {:?}",
                     self.module.types.get(env),
