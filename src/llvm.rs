@@ -443,21 +443,15 @@ impl<'a> StmtBuilder<'a> {
                 let nidx = idx.len() as u32;
                 LLVMBuildGEP2(self.bld, elem, p, pidx, nidx, cstr!(""))
             }
-            ExprKind::Field(x, i) => {
+            &ExprKind::Field(ref x, i) => {
                 let ty = self.tybld.irtype(x.ty);
-                match ty {
-                    Type::Struct(_) => {
-                        let sty = self.tybld.lltype(x.ty);
-                        let p = self.build_place(x);
-                        LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
-                    }
-                    Type::Pointer(ty) => {
-                        let sty = self.tybld.lltype(*ty);
-                        let p = self.build_scalar(x);
-                        LLVMBuildStructGEP2(self.bld, sty, p, *i, cstr!(""))
-                    }
+                let (sty_id, p) = match ty {
+                    Type::Tuple(_) | Type::Struct(_) => (x.ty, self.build_place(x)),
+                    &Type::Pointer(ty) => (ty, self.build_scalar(x)),
                     _ => panic!(),
-                }
+                };
+                let sty = self.tybld.lltype(sty_id);
+                LLVMBuildStructGEP2(self.bld, sty, p, i, cstr!(""))
             }
             ExprKind::Unary(Unop::Deref, p) => self.build_scalar(p),
             &ExprKind::Func(i) => self.llfuncs[i],

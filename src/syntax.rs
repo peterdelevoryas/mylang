@@ -210,6 +210,7 @@ pub enum ExprKind {
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Field(Box<Expr>, String),
+    TupleField(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
     Cast(Box<Expr>, Type),
     Bool(bool),
@@ -677,10 +678,34 @@ impl<'a> Parser<'a> {
         let mut e = self.parse_atom();
         while self.token == DOT {
             self.next();
-            let field_name = self.token_string();
-            self.parse(NAME);
+
+            let s = self.token_string();
+            let field = match self.token {
+                NAME => {
+                    self.next();
+                    ExprKind::Field(e.into(), s)
+                }
+                INTEGER => {
+                    self.next();
+                    let i: u32 = match s.parse() {
+                        Ok(i) => i,
+                        Err(e) => {
+                            print_cursor(self.text, self.start, self.end);
+                            println!("error parsing field index: {}", e);
+                            error();
+                        }
+                    };
+                    ExprKind::TupleField(e.into(), i)
+                }
+                _ => {
+                    print_cursor(self.text, self.start, self.end);
+                    println!("expected field name or index");
+                    error();
+                }
+            };
+
             e = Expr {
-                kind: ExprKind::Field(e.into(), field_name),
+                kind: field,
                 span: (start as u16, self.end as u16),
             };
         }

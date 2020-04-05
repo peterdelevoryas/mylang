@@ -260,6 +260,20 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match &e.kind {
+            &syntax::ExprKind::TupleField(ref tuple, i) => {
+                let tuple = self.build_expr(tuple, None);
+                let elem_ty = match self.module.types.get(tuple.ty) {
+                    Type::Tuple(elem_tys) => elem_tys[i as usize],
+                    ty => {
+                        let start = e.span.0 as usize;
+                        let end = e.span.1 as usize;
+                        print_cursor(self.text, start, end);
+                        println!("expected tuple, got {:?}", ty);
+                        error();
+                    }
+                };
+                (ExprKind::Field(tuple.into(), i), elem_ty)
+            }
             syntax::ExprKind::Tuple(elems) => {
                 let env: Vec<TypeId> = match env {
                     Some(ty) => match self.module.types.get(ty) {
