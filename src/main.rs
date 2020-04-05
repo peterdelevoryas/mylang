@@ -119,84 +119,13 @@ fn main() {
         }
         Ok(s) => s,
     };
-    println!("{:?}", text);
-    let mut p = syntax::Parser {
-        text: text,
-        start: 0,
-        end: 0,
-        token: syntax::EOF,
-    };
-    p.next();
-    let mut type_decls = vec![];
-    let mut func_decls = vec![];
-    let mut func_bodys = vec![];
-    let mut const_decls = vec![];
-    while p.token != syntax::EOF {
-        match p.token {
-            syntax::CONST => {
-                let const_decl = p.parse_const_decl();
-                const_decls.push(const_decl);
-            }
-            syntax::TYPE => {
-                let type_decl = p.parse_type_decl();
-                type_decls.push(type_decl);
-            }
-            syntax::FN => {
-                let decl = p.parse_func_decl();
-                let id = func_decls.len();
-                func_decls.push(decl);
-                if p.token == syntax::SEMICOLON {
-                    p.next();
-                    continue;
-                }
-
-                let body = p.parse_block();
-                let body = syntax::FuncBody { id: id, body: body };
-                func_bodys.push(body);
-            }
-            _ => {
-                print_cursor(p.text, p.start, p.start + 1);
-                println!("expected type or function");
-                error();
-            }
-        }
-    }
-    println!("{:?}", const_decls);
-    println!("{:?}", type_decls);
-    println!("{:?}", func_decls);
-    println!("{:?}", func_bodys);
-    let module = Module {
-        const_decls: const_decls,
-        type_decls: type_decls,
-        func_decls: func_decls,
-        func_bodys: func_bodys,
-    };
-
+    let module = syntax::parse(text);
     let module = ir::build(&module);
-    println!("{:?}", module.func_decls);
-    println!("{:?}", module.func_bodys);
-    for body in &module.func_bodys {
-        println!("func {:?} locals {:?}", body.id, body.locals);
-        for stmt in &body.body.stmts {
-            println!("{:?}", stmt);
-        }
-    }
-    println!("{:?}", module.types);
-    println!("{:?}", module.consts);
-
     unsafe {
         codegen::emit_object(&module);
     }
-
     ld("a.o", "a.out");
     let _ = fs::remove_file("a.o");
-}
-
-pub struct Module {
-    const_decls: Vec<syntax::ConstDecl>,
-    type_decls: Vec<syntax::TypeDecl>,
-    func_decls: Vec<syntax::FuncDecl>,
-    func_bodys: Vec<syntax::FuncBody>,
 }
 
 fn ld(path: &str, out: &str) {

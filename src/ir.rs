@@ -72,8 +72,6 @@ impl NameTable {
     }
 }
 
-use crate::Module;
-
 pub struct Module2 {
     pub func_decls: Vec<FuncDecl>,
     pub func_bodys: Vec<FuncBody>,
@@ -87,7 +85,7 @@ pub struct Const {
     pub expr: Expr,
 }
 
-pub fn build(module: &Module) -> Module2 {
+pub fn build(module: &syntax::Module) -> Module2 {
     let mut b = ModuleBuilder::default();
 
     b.add_type("i8", Type::I8);

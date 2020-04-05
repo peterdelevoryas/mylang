@@ -3,6 +3,64 @@ use crate::intern;
 use crate::print_cursor;
 use crate::String;
 
+#[derive(Debug)]
+pub struct Module {
+    pub const_decls: Vec<ConstDecl>,
+    pub type_decls: Vec<TypeDecl>,
+    pub func_decls: Vec<FuncDecl>,
+    pub func_bodys: Vec<FuncBody>,
+}
+
+pub fn parse(text: &str) -> Module {
+    let mut p = Parser {
+        text: text,
+        start: 0,
+        end: 0,
+        token: EOF,
+    };
+    p.next();
+    let mut type_decls = vec![];
+    let mut func_decls = vec![];
+    let mut func_bodys = vec![];
+    let mut const_decls = vec![];
+    while p.token != EOF {
+        match p.token {
+            CONST => {
+                let const_decl = p.parse_const_decl();
+                const_decls.push(const_decl);
+            }
+            TYPE => {
+                let type_decl = p.parse_type_decl();
+                type_decls.push(type_decl);
+            }
+            FN => {
+                let decl = p.parse_func_decl();
+                let id = func_decls.len();
+                func_decls.push(decl);
+                if p.token == SEMICOLON {
+                    p.next();
+                    continue;
+                }
+
+                let body = p.parse_block();
+                let body = FuncBody { id: id, body: body };
+                func_bodys.push(body);
+            }
+            _ => {
+                print_cursor(p.text, p.start, p.start + 1);
+                println!("expected type or function");
+                error();
+            }
+        }
+    }
+    Module {
+        const_decls: const_decls,
+        type_decls: type_decls,
+        func_decls: func_decls,
+        func_bodys: func_bodys,
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
     BREAK,
