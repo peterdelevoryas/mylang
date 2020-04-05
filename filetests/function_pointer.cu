@@ -6,8 +6,10 @@ fn add(x: i32, y: i32) -> i32 {
     return z;
 }
 
-fn main() {
+fn main() -> i32 {
     // check: 1 + 2 = 3
     let f: *fn(i32, i32) -> i32 = &add;
     f(1, 2);
+
+    return 0;
 }

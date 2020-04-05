@@ -735,6 +735,37 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         match self.token {
+            FN => {
+                self.next();
+                self.parse(LPARENS);
+                let mut var_args = false;
+                let mut params = vec![];
+                while self.token != RPARENS {
+                    if self.token == ELLIPSIS {
+                        self.next();
+                        var_args = true;
+                        break;
+                    }
+                    let ty = self.parse_type();
+                    params.push(ty);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RPARENS);
+
+                let ret = match self.token {
+                    ARROW => {
+                        self.next();
+                        self.parse_type()
+                    }
+                    _ => Type::Unit,
+                };
+
+                let ty = FuncType { params, ret, var_args };
+                Type::Func(ty.into())
+            }
             LBRACKET => {
                 self.next();
                 let s = self.token_string();
@@ -770,27 +801,6 @@ impl<'a> Parser<'a> {
                 error();
             }
         }
-    }
-
-    fn parse_list<T>(
-        &mut self,
-        mut parse_elem: impl FnMut(&mut Self) -> T,
-        start: Token,
-        end: Token,
-        separator: Token,
-    ) -> Vec<T> {
-        self.parse(start);
-        let mut list = vec![];
-        while self.token != end {
-            let elem = parse_elem(self);
-            list.push(elem);
-            if self.token != separator {
-                break;
-            }
-            self.next();
-        }
-        self.parse(end);
-        list
     }
 
     fn token_string(&self) -> String {

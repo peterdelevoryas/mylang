@@ -450,6 +450,7 @@ impl<'a> StmtBuilder<'a> {
                 }
             }
             ExprKind::Unary(Unop::Deref, p) => self.build_scalar(p),
+            &ExprKind::Func(i) => self.llfuncs[i],
             k => unimplemented!("build place {:?}", k),
         }
     }
@@ -482,7 +483,12 @@ impl<'a> StmtBuilder<'a> {
     }
 
     unsafe fn build_call(&mut self, func: &Expr, args: &[Expr], sret: Option<LLVMValueRef>) -> LLVMValueRef {
-        let fnty = self.tybld.lltype(func.ty);
+        let fnty = match self.tybld.irtype(func.ty) {
+            &Type::Func(_) => func.ty,
+            &Type::Pointer(fnty) => fnty,
+            _ => panic!(),
+        };
+        let fnty = self.tybld.lltype(fnty);
         let func = self.build_scalar(func);
         let mut args2 = vec![];
         for arg in args {

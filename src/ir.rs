@@ -429,6 +429,10 @@ impl<'a> FuncBuilder<'a> {
                 // Infer function type.
                 let fnty = match self.module.types.get(func.ty) {
                     Type::Func(fnty) => fnty.clone(),
+                    &Type::Pointer(ty) => match self.module.types.get(ty) {
+                        Type::Func(fnty) => fnty.clone(),
+                        _ => panic!(),
+                    },
                     _ => panic!(),
                 };
                 // Verify return type matches environment type.
@@ -673,7 +677,18 @@ impl ModuleBuilder {
                 let ty = self.build_type(ty);
                 self.types.intern(Type::Pointer(ty))
             }
-            syntax::Type::Func(_) => unimplemented!(),
+            syntax::Type::Func(func) => {
+                let mut params = vec![];
+                for param in &func.params {
+                    let param = self.build_type(param);
+                    params.push(param);
+                }
+                let ret = self.build_type(&func.ret);
+                let var_args = func.var_args;
+                let func = FuncType { params, ret, var_args };
+                let func = Type::Func(func);
+                self.types.intern(func)
+            }
             syntax::Type::Unit => self.types.intern(Type::Unit),
             syntax::Type::Array(n, elem_ty) => {
                 let elem_ty = self.build_type(elem_ty);
