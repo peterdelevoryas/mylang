@@ -151,7 +151,6 @@ impl<'a> TypeBuilder<'a> {
         }
         for (id, ty) in types.iter().enumerate() {
             if let Type::Struct(sty) = ty {
-                println!("create struct body {:?}", sty.name);
                 b.set_struct_body(id, sty);
             }
         }

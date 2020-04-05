@@ -70,6 +70,8 @@ pub enum Token {
     NULL,
     CONST,
     SIZEOF,
+    STAREQ,
+    SLASHEQ,
     PLUSEQ,
     MINUSEQ,
     AMPERSAND,
@@ -252,9 +254,11 @@ impl<'a> Parser<'a> {
         let (token, n) = match c {
             '-' if d == '>' => (ARROW, 2),
             '-' if d == '-' => (MINUSEQ, 2),
+            '+' if d == '=' => (PLUSEQ, 2),
+            '*' if d == '=' => (STAREQ, 2),
+            '/' if d == '=' => (SLASHEQ, 2),
             '-' => (MINUS, 1),
             '&' => (AMPERSAND, 1),
-            '+' if d == '=' => (PLUSEQ, 2),
             '+' => (PLUS, 1),
             '(' => (LPARENS, 1),
             ')' => (RPARENS, 1),
@@ -576,10 +580,12 @@ impl<'a> Parser<'a> {
                         let x = self.parse_expr();
                         Stmt::Assign(e, x)
                     }
-                    PLUSEQ | MINUSEQ => {
+                    STAREQ | SLASHEQ | PLUSEQ | MINUSEQ => {
                         let op = match self.token {
                             PLUSEQ => PLUS,
                             MINUSEQ => MINUS,
+                            STAREQ => STAR,
+                            SLASHEQ => SLASH,
                             _ => unreachable!(),
                         };
                         self.next();
