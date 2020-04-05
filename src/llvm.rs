@@ -185,6 +185,14 @@ impl<'a> TypeBuilder<'a> {
                 let elem_ty = self.build_type(*elem_ty);
                 LLVMArrayType(elem_ty, *n)
             }
+            Type::Tuple(elem_tys) => {
+                let mut ll_elem_tys = vec![];
+                for &elem_ty in elem_tys {
+                    let elem_ty = self.build_type(elem_ty);
+                    ll_elem_tys.push(elem_ty);
+                }
+                LLVMStructType(ll_elem_tys.as_mut_ptr(), ll_elem_tys.len() as u32, 0)
+            }
         }
     }
 
@@ -520,6 +528,14 @@ impl<'a> StmtBuilder<'a> {
 
     unsafe fn build_aggregate(&mut self, e: &Expr, dst: LLVMValueRef) {
         match &e.kind {
+            ExprKind::Tuple(elems) => {
+                let tuple_ty = self.tybld.lltype(e.ty);
+                for (i, e) in elems.iter().enumerate() {
+                    let i = i as u32;
+                    let dst = LLVMBuildStructGEP2(self.bld, tuple_ty, dst, i, cstr!(""));
+                    let _ = self.build_expr(e, Some(dst));
+                }
+            }
             ExprKind::Struct(fields) => {
                 let sty = self.tybld.lltype(e.ty);
                 for (i, e) in fields {

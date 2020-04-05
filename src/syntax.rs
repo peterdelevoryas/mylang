@@ -208,6 +208,7 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(String, Expr)>),
     Array(Vec<Expr>),
+    Tuple(Vec<Expr>),
     Field(Box<Expr>, String),
     Index(Box<Expr>, Box<Expr>),
     Cast(Box<Expr>, Type),
@@ -775,15 +776,21 @@ impl<'a> Parser<'a> {
             }
             LPARENS => {
                 self.next();
-                let e = match self.token {
-                    RPARENS => None,
-                    _ => Some(self.parse_expr()),
-                };
+                let mut elems = vec![];
+                while self.token != RPARENS {
+                    let e = self.parse_expr();
+                    elems.push(e);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
                 self.parse(RPARENS);
 
-                match e {
-                    Some(e) => e.kind,
-                    None => ExprKind::Unit
+                match elems.len() {
+                    0 => ExprKind::Unit,
+                    1 => elems.pop().unwrap().kind,
+                    _ => ExprKind::Tuple(elems),
                 }
             }
             TRUE => {

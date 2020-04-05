@@ -260,6 +260,26 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match &e.kind {
+            syntax::ExprKind::Tuple(elems) => {
+                let env: Vec<TypeId> = match env {
+                    Some(ty) => match self.module.types.get(ty) {
+                        Type::Tuple(elems) => elems.clone(),
+                        _ => vec![],
+                    },
+                    None => vec![],
+                };
+                let mut xelems = vec![];
+                let mut elem_tys = vec![];
+                for (i, elem) in elems.iter().enumerate() {
+                    let env = env.get(i).map(|&ty| ty);
+                    let elem = self.build_expr(elem, env);
+                    elem_tys.push(elem.ty);
+                    xelems.push(elem);
+                }
+                let tuple_ty = Type::Tuple(elem_tys);
+                let tuple_ty = self.module.types.intern(tuple_ty);
+                (ExprKind::Tuple(xelems), tuple_ty)
+            }
             &syntax::ExprKind::Char(c) => {
                 let i8 = self.module.types.intern(Type::I8);
                 (ExprKind::Char(c), i8)
@@ -732,6 +752,7 @@ pub enum Type {
     Pointer(TypeId),
     Func(FuncType),
     Struct(StructType),
+    Tuple(Vec<TypeId>),
     Array(TypeId, u32),
     Unit,
     Bool,
@@ -752,6 +773,7 @@ impl Type {
             Type::Pointer(_) => TypeKind::Scalar,
             Type::Struct(_) => TypeKind::Aggregate,
             Type::Array(_, _) => TypeKind::Aggregate,
+            Type::Tuple(_) => TypeKind::Aggregate,
         }
     }
 
@@ -769,6 +791,7 @@ impl Type {
             Type::Pointer(_) => ScalarKind::Pointer,
             Type::Struct(_) => panic!(),
             Type::Array(_, _) => panic!(),
+            Type::Tuple(_) => panic!(),
         }
     }
 }
@@ -895,6 +918,7 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(u32, Expr)>),
     Array(Vec<Expr>),
+    Tuple(Vec<Expr>),
     Field(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
     MethodCall(FuncId, Box<Expr>),
