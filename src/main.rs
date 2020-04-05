@@ -11,9 +11,9 @@ mod syntax;
 fn usage() {
     println!(
         "\
-OVERVIEW: r2 LLVM compiler
+OVERVIEW: cu LLVM compiler
 
-USAGE: r2 [options] file...
+USAGE: cu [options] file...
 
 OPTIONS:
     -h | --help             Display available options.

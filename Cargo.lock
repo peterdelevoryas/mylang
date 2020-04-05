@@ -126,6 +126,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cu"
+version = "0.1.0"
+dependencies = [
+ "filecheck",
+ "llvm-sys",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -304,14 +312,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bdc6c187c65bca4260c9011c9e3132efe4909da44726bad24cf7572ae338d7f"
 dependencies = [
  "proc-macro2 1.0.10",
-]
-
-[[package]]
-name = "r2"
-version = "0.1.0"
-dependencies = [
- "filecheck",
- "llvm-sys",
 ]
 
 [[package]]
