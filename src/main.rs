@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::process::exit;
 
 mod codegen;
-mod ir0;
+mod ir;
 mod syntax;
 
 fn usage() {
@@ -172,7 +172,7 @@ fn main() {
         func_bodys: func_bodys,
     };
 
-    let module = ir0::build(&module);
+    let module = ir::build(&module);
     println!("{:?}", module.func_decls);
     println!("{:?}", module.func_bodys);
     for body in &module.func_bodys {

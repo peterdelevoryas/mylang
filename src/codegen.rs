@@ -1,5 +1,5 @@
 use crate::error;
-use crate::ir0::*;
+use crate::ir::*;
 use llvm_sys::*;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
