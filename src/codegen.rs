@@ -554,23 +554,6 @@ impl<'a> StmtBuilder<'a> {
                 LLVMBuildStore(self.bld, v, dst);
             }
         }
-        match self.tybld.irtype(ty) {
-            Type::Unit => {}
-            Type::Struct(sty) => {
-                let llsty = self.tybld.lltype(ty);
-                for (i, &(_, field_ty)) in sty.fields.iter().enumerate() {
-                    let i = i as u32;
-                    let src = LLVMBuildStructGEP2(self.bld, llsty, src, i, cstr!(""));
-                    let dst = LLVMBuildStructGEP2(self.bld, llsty, dst, i, cstr!(""));
-                    self.copy(field_ty, src, dst);
-                }
-            }
-            _ => {
-                let lltype = self.tybld.lltype(ty);
-                let v = LLVMBuildLoad2(self.bld, lltype, src, cstr!(""));
-                LLVMBuildStore(self.bld, v, dst);
-            }
-        }
     }
 
     unsafe fn build_scalar(&mut self, e: &Expr) -> LLVMValueRef {
