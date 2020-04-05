@@ -3,6 +3,7 @@ use std::fmt;
 use std::fs;
 use std::ops::Deref;
 use std::process::exit;
+use llvm_sys;
 
 mod syntax;
 mod ir;
@@ -17,16 +18,27 @@ USAGE: cu [options] file...
 
 OPTIONS:
     -h | --help             Display available options.
+    --print-llvm            Display generated LLVM IR.
 "
     );
 }
 
-fn parse_args() -> std::string::String {
+struct Args {
+    path: std::string::String,
+    print_llvm: bool,
+}
+
+fn parse_args() -> Args {
     let mut path = None;
+    let mut print_llvm = false;
     for arg in env::args().skip(1) {
         if arg == "-h" || arg == "--help" {
             usage();
             error();
+        }
+        if arg == "--print-llvm" {
+            print_llvm = true;
+            continue;
         }
         if let Some(path) = path {
             println!("multiple file arguments: {:?}, {:?}", path, arg);
@@ -35,14 +47,15 @@ fn parse_args() -> std::string::String {
         }
         path = Some(arg);
     }
-    match path {
+    let path = match path {
         None => {
             println!("missing file argument");
             usage();
             error();
         }
         Some(path) => path,
-    }
+    };
+    Args { path, print_llvm }
 }
 
 fn error() -> ! {
@@ -111,10 +124,10 @@ fn print_cursor(text: &str, start: usize, end: usize) {
 }
 
 fn main() {
-    let path = &parse_args();
-    let text = &match fs::read_to_string(path) {
+    let args = parse_args();
+    let text = &match fs::read_to_string(&args.path) {
         Err(e) => {
-            println!("unable to read {:?}: {}", path, e);
+            println!("unable to read {:?}: {}", args.path, e);
             error();
         }
         Ok(s) => s,
@@ -123,6 +136,9 @@ fn main() {
     let module = ir::build(&module);
     unsafe {
         let module = llvm::build(&module);
+        if args.print_llvm {
+            llvm_sys::LLVMDumpModule(module);
+        }
         llvm::verify(module);
         llvm::emit_object(module);
     }
