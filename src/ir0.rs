@@ -379,6 +379,36 @@ impl<'a> FuncBuilder<'a> {
                     self.module.types.intern(Type::Struct(sty)),
                 )
             }
+            syntax::Expr::Array(elems) => {
+                let (elem_ty, n) = match env {
+                    None => (None, None),
+                    Some(ty) => match self.module.types.get(ty) {
+                        &Type::Array(elem_ty, n) => (Some(elem_ty), Some(n)),
+                        ty => panic!("expected {:?}, got {:?}", ty, e),
+                    },
+                };
+                if let Some(n) = n {
+                    let n = n as usize;
+                    if elems.len() != n {
+                        panic!("expected array with {:?} elems, got {:?}", n, elems.len());
+                    }
+                }
+                let mut elems2 = vec![];
+                for e in elems {
+                    let e = self.build_expr(e, elem_ty);
+                    elems2.push(e);
+                }
+                let elem_ty = match elem_ty {
+                    Some(ty) => ty,
+                    None => match elems2.first() {
+                        Some(e) => e.ty,
+                        None => panic!("cannot infer type of empty array"),
+                    },
+                };
+                let array_ty = Type::Array(elem_ty, elems2.len() as u32);
+                let array_ty = self.module.types.intern(array_ty);
+                (ExprKind::Array(elems2), array_ty)
+            }
             syntax::Expr::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::Expr::Call(func, args) => {
                 let mut func = self.build_expr(func, None);
@@ -842,6 +872,7 @@ pub enum ExprKind {
     String(String),
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(u32, Expr)>),
+    Array(Vec<Expr>),
     Field(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
     MethodCall(FuncId, Box<Expr>),

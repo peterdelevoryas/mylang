@@ -520,6 +520,19 @@ impl<'a> StmtBuilder<'a> {
                     let _ = self.build_expr(e, Some(dst));
                 }
             }
+            ExprKind::Array(elems) => {
+                let aty = self.tybld.lltype(e.ty);
+                for (i, e) in elems.iter().enumerate() {
+                    let i = i as u64;
+                    let z = LLVMConstInt(LLVMInt32Type(), 0, 0);
+                    let i = LLVMConstInt(LLVMInt32Type(), i, 0); // FIXME should sign extend?
+                    let mut idxs = [z, i];
+                    let idxs_ptr = idxs.as_mut_ptr();
+                    let idxs_len = idxs.len() as u32;
+                    let dst = LLVMBuildInBoundsGEP2(self.bld, aty, dst, idxs_ptr, idxs_len, cstr!(""));
+                    let _ = self.build_expr(e, Some(dst));
+                }
+            }
             ExprKind::Call(func, args) => {
                 let _ = self.build_call(func, args, Some(dst));
             }

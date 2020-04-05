@@ -141,6 +141,7 @@ pub enum Expr {
     String(String),
     Call(Box<Expr>, Vec<Expr>),
     Struct(Vec<(String, Expr)>),
+    Array(Vec<Expr>),
     Field(Box<Expr>, String),
     Index(Box<Expr>, Box<Expr>),
     Cast(Box<Expr>, Type),
@@ -663,6 +664,20 @@ impl<'a> Parser<'a> {
                 }
                 self.parse(RBRACE);
                 Expr::Struct(fields)
+            }
+            LBRACKET => {
+                self.next();
+                let mut elems = vec![];
+                while self.token != RBRACKET {
+                    let e = self.parse_expr();
+                    elems.push(e);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RBRACKET);
+                Expr::Array(elems)
             }
             LPARENS => {
                 self.next();
