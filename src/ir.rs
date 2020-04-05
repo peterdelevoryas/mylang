@@ -182,7 +182,10 @@ impl<'a> FuncBuilder<'a> {
             syntax::Stmt::OpAssign(op, x, y) => {
                 let x2 = Box::new((*x).clone());
                 let y2 = Box::new((*y).clone());
-                let rhs = syntax::Expr { kind: syntax::ExprKind::Binary(*op, x2, y2) };
+                let rhs = syntax::Expr {
+                    kind: syntax::ExprKind::Binary(*op, x2, y2),
+                    span: (x.span.0, y.span.1),
+                };
                 let lhs = self.build_expr(x, None);
                 let rhs = self.build_expr(&rhs, Some(lhs.ty));
                 Stmt::Assign(lhs, rhs)
