@@ -228,15 +228,15 @@ impl<'a> TypeBuilder<'a> {
             params.push(ty);
         }
 
-        let ret = match self.irtype(func.ret) {
-            Type::Struct(_) => {
+        let ret = match self.irtype(func.ret).kind() {
+            TypeKind::Aggregate => {
                 let ret = self.lltype(func.ret);
                 let sret = LLVMPointerType(ret, 0);
                 params.push(sret);
                 LLVMVoidType()
             }
-            Type::Unit => LLVMVoidType(),
-            _ => self.lltype(func.ret),
+            TypeKind::Unit => LLVMVoidType(),
+            TypeKind::Scalar => self.lltype(func.ret),
         };
         let var_args = if func.var_args { 1 } else { 0 };
 
@@ -256,9 +256,10 @@ unsafe fn build_func_body(
     let entry = LLVMAppendBasicBlock(llfunc, cstr!("entry"));
     LLVMPositionBuilderAtEnd(b, entry);
 
-    let sret = match type_bld.irtype(func.ty.ret) {
-        Type::Struct(_) => Some(LLVMGetLastParam(llfunc)),
-        _ => None,
+    let sret = match type_bld.irtype(func.ty.ret).kind() {
+        TypeKind::Aggregate => Some(LLVMGetLastParam(llfunc)),
+        TypeKind::Unit => None,
+        TypeKind::Scalar => None,
     };
 
     let mut locals = vec![];

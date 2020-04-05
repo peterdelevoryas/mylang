@@ -710,6 +710,15 @@ impl ModuleBuilder {
 
     fn build_type(&mut self, ty: &syntax::Type) -> TypeId {
         match ty {
+            syntax::Type::Tuple(elem_tys) => {
+                let mut xelem_tys = vec![];
+                for elem_ty in elem_tys {
+                    let elem_ty = self.build_type(elem_ty);
+                    xelem_tys.push(elem_ty);
+                }
+                let tuple = Type::Tuple(xelem_tys);
+                self.types.intern(tuple)
+            }
             syntax::Type::Name(name) => match self.names.get(*name) {
                 Some(Def::Type(i)) => i,
                 x => panic!("building type: {:?} def = {:?}", name, x),

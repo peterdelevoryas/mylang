@@ -123,6 +123,7 @@ pub enum Type {
     Pointer(Box<Type>),
     Func(Box<FuncType>),
     Array(u32, Box<Type>),
+    Tuple(Vec<Type>),
 }
 
 #[derive(Debug, Clone)]
@@ -888,6 +889,24 @@ impl<'a> Parser<'a> {
 
                 let ty = FuncType { params, ret, var_args };
                 Type::Func(ty.into())
+            }
+            LPARENS => {
+                self.next();
+                let mut elem_tys = vec![];
+                while self.token != RPARENS {
+                    let elem_ty = self.parse_type();
+                    elem_tys.push(elem_ty);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RPARENS);
+
+                match elem_tys.len() {
+                    0 => Type::Unit,
+                    _ => Type::Tuple(elem_tys),
+                }
             }
             LBRACKET => {
                 self.next();
