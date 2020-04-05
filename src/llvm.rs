@@ -12,12 +12,49 @@ macro_rules! cstr {
     })
 }
 
-pub unsafe fn emit_object(module: &Module2) {
+pub unsafe fn build(module: &Module2) -> LLVMModuleRef {
+    let llmodule = LLVMModuleCreateWithName(cstr!("a"));
+
+    let b = LLVMCreateBuilder();
+    let type_bld = &TypeBuilder::new(&module.types);
+    let llconsts = &build_consts(type_bld, &module.consts);
+
+    let mut llfuncs = vec![];
+    for func_decl in &module.func_decls {
+        let lltype = type_bld.func_type(&func_decl.ty);
+        let mut name = func_decl.name.deref().to_string();
+        name.push('\0');
+        let mut link_name = name.as_ptr() as *const i8;
+        if cfg!(target_os = "macos") && name == "readdir\0" {
+            link_name = "readdir$INODE64\0".as_ptr() as *const i8;
+        }
+        let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
+        llfuncs.push(llfunc);
+    }
+    let llfuncs = &llfuncs;
+
+    for func_body in &module.func_bodys {
+        let func_decl = &module.func_decls[func_body.id];
+        build_func_body(b, type_bld, llfuncs, llconsts, func_decl, func_body);
+    }
+
+    llmodule
+}
+
+pub unsafe fn verify(llmodule: LLVMModuleRef) {
+    let mut msg = ptr::null_mut();
+    LLVMVerifyModule(
+        llmodule,
+        LLVMVerifierFailureAction_LLVMAbortProcessAction,
+        &mut msg,
+    );
+}
+
+pub unsafe fn emit_object(llmodule: LLVMModuleRef) {
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
-    let llmodule = LLVMModuleCreateWithName(cstr!("a"));
 
     let triple = LLVMGetDefaultTargetTriple();
     let mut target = MaybeUninit::uninit().assume_init();
@@ -43,41 +80,6 @@ pub unsafe fn emit_object(module: &Module2) {
     LLVMSetModuleDataLayout(llmodule, layout);
     LLVMSetTarget(llmodule, triple);
 
-    let b = LLVMCreateBuilder();
-    let type_bld = &TypeBuilder::new(&module.types);
-    let llconsts = &build_consts(type_bld, &module.consts);
-
-    let mut llfuncs = vec![];
-    for func_decl in &module.func_decls {
-        let lltype = type_bld.func_type(&func_decl.ty);
-        let mut name = func_decl.name.deref().to_string();
-        name.push('\0');
-        let mut link_name = name.as_ptr() as *const i8;
-        if cfg!(target_os = "macos") && name == "readdir\0" {
-            link_name = "readdir$INODE64\0".as_ptr() as *const i8;
-        }
-        println!("link name {:?}", name);
-        let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
-        llfuncs.push(llfunc);
-    }
-    let llfuncs = &llfuncs;
-
-    for func_body in &module.func_bodys {
-        let func_decl = &module.func_decls[func_body.id];
-        build_func_body(b, type_bld, llfuncs, llconsts, func_decl, func_body);
-    }
-
-    LLVMDumpModule(llmodule);
-    let mut msg = ptr::null_mut();
-    LLVMVerifyModule(
-        llmodule,
-        LLVMVerifierFailureAction_LLVMAbortProcessAction,
-        &mut msg,
-    );
-    if !msg.is_null() {
-        let msg = CStr::from_ptr(msg);
-        println!("verify message: {:?}", msg.to_str().unwrap());
-    }
     let mut msg = ptr::null_mut();
     if LLVMTargetMachineEmitToFile(
         machine,

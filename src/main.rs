@@ -4,9 +4,9 @@ use std::fs;
 use std::ops::Deref;
 use std::process::exit;
 
-mod codegen;
-mod ir;
 mod syntax;
+mod ir;
+mod llvm;
 
 fn usage() {
     println!(
@@ -122,7 +122,9 @@ fn main() {
     let module = syntax::parse(text);
     let module = ir::build(&module);
     unsafe {
-        codegen::emit_object(&module);
+        let module = llvm::build(&module);
+        llvm::verify(module);
+        llvm::emit_object(module);
     }
     ld("a.o", "a.out");
     let _ = fs::remove_file("a.o");
