@@ -390,34 +390,12 @@ impl<'a> FuncBuilder<'a> {
                     Type::Struct(sty) => sty,
                     _ => panic!(),
                 };
-                if let Some(i) = sty.field_index(*field_name) {
-                    let ty = sty.fields[i].1;
-                    (ExprKind::Field(e.into(), i as u32), ty)
-                } else {
-                    // Try to find a function to use as a method call.
-                    let mut func_id = None;
-                    for (i, func) in self.module.func_decls.iter().enumerate() {
-                        if func.name != *field_name {
-                            continue;
-                        }
-                        if func.ty.params.len() == 0 {
-                            continue;
-                        }
-                        let first_ty = func.ty.params[0];
-                        if first_ty == e.ty {
-                            func_id = Some(i);
-                            break;
-                        }
-                    }
-                    if let Some(i) = func_id {
-                        let mut fnty = self.module.func_decls[i].ty.clone();
-                        fnty.params.remove(0);
-                        let fnty = self.module.types.intern(Type::Func(fnty));
-                        (ExprKind::MethodCall(i, e.into()), fnty)
-                    } else {
-                        panic!("unable to find {:?} on {:?}", field_name, sty.name);
-                    }
-                }
+                let i = match sty.field_index(*field_name) {
+                    Some(i) => i,
+                    None => panic!("field {:?} not found on struct {:?}", field_name, sty.name),
+                };
+                let ty = sty.fields[i].1;
+                (ExprKind::Field(e.into(), i as u32), ty)
             }
             syntax::ExprKind::Struct(fields) => {
                 let ty = match env {
@@ -472,20 +450,8 @@ impl<'a> FuncBuilder<'a> {
             }
             syntax::ExprKind::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::ExprKind::Call(func, args) => {
-                let mut func = self.build_expr(func, None);
+                let func = self.build_expr(func, None);
                 let mut args2 = vec![];
-                func = match func.kind {
-                    ExprKind::MethodCall(i, arg) => {
-                        args2.push(*arg);
-                        let fnty = self.module.func_decls[i].ty.clone();
-                        let fnty = self.module.types.intern(Type::Func(fnty));
-                        Expr {
-                            kind: ExprKind::Func(i),
-                            ty: fnty,
-                        }
-                    }
-                    _ => func,
-                };
 
                 // Infer function type.
                 let fnty = match self.module.types.get(func.ty) {
@@ -971,7 +937,6 @@ pub enum ExprKind {
     Tuple(Vec<Expr>),
     Field(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
-    MethodCall(FuncId, Box<Expr>),
     Cast(Box<Expr>, TypeId),
     Bool(bool),
     Char(u8),

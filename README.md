@@ -10,7 +10,6 @@ This language is approximately equal to C, but with some essential modern featur
 - `bool` type
 - Tuples
 - First-class `()` type and value replaces `void`
-- Uniform function call syntax (https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax)
 - Compile-time constants (replacing macros or static data)
 
 Some more features that I want to add, but haven't finished implementing yet:
@@ -21,6 +20,7 @@ Some more features that I want to add, but haven't finished implementing yet:
 - Pattern matching (like Rust `match`)
 - Module system
 - SIMD primitive types
+- Uniform function call syntax
 
 The `filetests/` directory contains examples of all language features, below
 some are reproduced with added comments.

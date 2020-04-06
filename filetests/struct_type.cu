@@ -10,8 +10,6 @@ fn make_string(ptr: *i8) -> string {
     return { ptr: ptr };
 }
 
-// Free functions can be used with method syntax!
-
 fn cmp(x: string, y: string) -> i32 {
     return strcmp(x.ptr, y.ptr);
 }
@@ -26,10 +24,10 @@ fn main() -> i32 {
     // nextln: 7
     let s: string = make_string("abcdefg");
     printf("%s\n", s.ptr);
-    printf("%d\n", s.len());
+    printf("%d\n", len(s));
 
     // nextln: 0
-    printf("%d\n", s.cmp(s));
+    printf("%d\n", cmp(s, s));
 
     return 0;
 }
