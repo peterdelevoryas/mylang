@@ -161,15 +161,17 @@ impl<'a> FuncBuilder<'a> {
             stmts: vec![],
         };
         for stmt in &block.stmts {
-            let stmt = self.build_stmt(stmt);
-            block2.stmts.push(stmt);
+            let stmts = self.build_stmt(stmt);
+            for stmt in stmts {
+                block2.stmts.push(stmt);
+            }
         }
         self.module.names.exit_scope(scope);
         block2
     }
 
-    fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Stmt {
-        match stmt {
+    fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Vec<Stmt> {
+        let stmt = match stmt {
             syntax::Stmt::Break => Stmt::Break,
             syntax::Stmt::Continue => Stmt::Continue,
             syntax::Stmt::For(init, cond, post, body) => {
@@ -210,7 +212,7 @@ impl<'a> FuncBuilder<'a> {
                 let body = self.build_block(body);
                 Stmt::If(cond, body)
             }
-            syntax::Stmt::Let(name, ty, e) => {
+            syntax::Stmt::Let(pattern, ty, e) => {
                 let ty = match ty {
                     Some(ty) => Some(self.module.build_type(ty)),
                     None => None,
@@ -225,18 +227,7 @@ impl<'a> FuncBuilder<'a> {
                     _ => panic!("let must have type or expression"),
                 };
 
-                let i = self.body.locals.len();
-                let x = Expr {
-                    kind: ExprKind::Local(i),
-                    ty: ty,
-                };
-                self.body.locals.push(x.ty);
-                self.module.names.def(*name, Def::Local(i));
-
-                match e {
-                    Some(e) => Stmt::Assign(x, e),
-                    None => Stmt::Expr(self.unit()),
-                }
+                return self.build_pattern(pattern, ty, e);
             }
             syntax::Stmt::Return(e) => {
                 let ret = self.module.func_decls[self.body.id].ty.ret;
@@ -247,15 +238,56 @@ impl<'a> FuncBuilder<'a> {
                 let e = self.build_expr(e, None);
                 Stmt::Expr(e)
             }
-        }
+        };
+        vec![stmt]
     }
 
-    fn unit(&mut self) -> Expr {
-        let ty = self.module.types.intern(Type::Unit);
-        Expr {
-            kind: ExprKind::Unit,
-            ty,
+    fn build_pattern(
+        &mut self,
+        lhs: &syntax::Pattern,
+        ty: TypeId,
+        rhs: Option<Expr>,
+    ) -> Vec<Stmt> {
+        let local_id = self.new_local(ty);
+        let local = Expr {
+            kind: ExprKind::Local(local_id),
+            ty: ty,
+        };
+        let mut assigns = vec![];
+        if let Some(e) = rhs {
+            assigns.push(Stmt::Assign(local.clone(), e));
         }
+        match lhs {
+            &syntax::Pattern::Name(name) => {
+                self.module.names.def(name, Def::Local(local_id));
+            }
+            syntax::Pattern::Tuple(elems) => {
+                // Unwrap type as tuple, get element types.
+                let elem_tys = match self.module.types.get(ty) {
+                    Type::Tuple(elem_tys) => elem_tys.clone(),
+                    _ => panic!("tuple pattern doesn't have tuple type"),
+                };
+                assert_eq!(elems.len(), elem_tys.len());
+                for (i, (elem, ty)) in elems.iter().zip(elem_tys).enumerate() {
+                    let i = i as u32;
+                    let field = Expr {
+                        kind: ExprKind::Field(local.clone().into(), i),
+                        ty: ty,
+                    };
+                    let stmts = self.build_pattern(elem, ty, Some(field));
+                    for stmt in stmts {
+                        assigns.push(stmt);
+                    }
+                }
+            }
+        }
+        assigns
+    }
+
+    fn new_local(&mut self, ty: TypeId) -> LocalId {
+        let i = self.body.locals.len();
+        self.body.locals.push(ty);
+        i
     }
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
@@ -889,12 +921,12 @@ pub enum Stmt {
     Expr(Expr),
     If(Expr, Block),
     While(Expr, Block),
-    For(Box<Stmt>, Expr, Box<Stmt>, Block),
+    For(Vec<Stmt>, Expr, Vec<Stmt>, Block),
     Break,
     Continue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     pub kind: ExprKind,
     pub ty: TypeId,
@@ -925,7 +957,7 @@ pub enum Binop {
     Cmp(Predicate),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     Null,
     Unit,

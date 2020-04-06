@@ -180,8 +180,14 @@ pub struct Block {
 }
 
 #[derive(Debug, Clone)]
+pub enum Pattern {
+    Name(String),
+    Tuple(Vec<Pattern>),
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
-    Let(String, Option<Type>, Option<Expr>),
+    Let(Pattern, Option<Type>, Option<Expr>),
     Return(Expr),
     Expr(Expr),
     If(Expr, Block),
@@ -504,6 +510,35 @@ impl<'a> Parser<'a> {
         Block { stmts }
     }
 
+    fn parse_pattern(&mut self) -> Pattern {
+        match self.token {
+            NAME => {
+                let name = self.token_string();
+                self.next();
+                Pattern::Name(name)
+            }
+            LPARENS => {
+                self.next();
+                let mut elems = vec![];
+                while self.token != RPARENS {
+                    let elem = self.parse_pattern();
+                    elems.push(elem);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RPARENS);
+                Pattern::Tuple(elems)
+            }
+            _ => {
+                print_cursor(self.text, self.start, self.end);
+                println!("expected pattern");
+                error();
+            }
+        }
+    }
+
     fn parse_stmt(&mut self) -> Stmt {
         match self.token {
             BREAK => {
@@ -539,9 +574,7 @@ impl<'a> Parser<'a> {
             LET => {
                 self.next();
 
-                let name = self.token_string();
-                self.parse(NAME);
-
+                let pattern = self.parse_pattern();
                 let ty = match self.token {
                     COLON => {
                         self.next();
@@ -549,7 +582,6 @@ impl<'a> Parser<'a> {
                     }
                     _ => None,
                 };
-
                 let e = match self.token {
                     ASSIGN => {
                         self.next();
@@ -559,7 +591,7 @@ impl<'a> Parser<'a> {
                     _ => None,
                 };
 
-                Stmt::Let(name, ty, e)
+                Stmt::Let(pattern, ty, e)
             }
             RETURN => {
                 self.next();

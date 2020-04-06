@@ -342,7 +342,9 @@ impl<'a> StmtBuilder<'a> {
                 LLVMBuildBr(self.bld, block);
             }
             Stmt::For(init, cond, post, body) => {
-                self.build_stmt(init);
+                for stmt in init {
+                    self.build_stmt(stmt);
+                }
                 let head = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let then = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
                 let tail = LLVMAppendBasicBlock(self.llfunc, cstr!(""));
@@ -362,7 +364,9 @@ impl<'a> StmtBuilder<'a> {
                 LLVMBuildBr(self.bld, tail);
 
                 self.position_at_end(tail);
-                self.build_stmt(post);
+                for stmt in post {
+                    self.build_stmt(stmt);
+                }
                 LLVMBuildBr(self.bld, head);
 
                 self.position_at_end(done);
