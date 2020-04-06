@@ -15,7 +15,6 @@ This language is approximately equal to C, but with some essential modern featur
 
 Some more features that I want to add, but haven't finished implementing yet:
 
-- Tuple destructuring
 - Generics
 - Fat pointer primitive (`ptr` + `len`): `[]T`, like Rust `&[T]` slice type
 - Sum types (like Rust `enum`'s)
