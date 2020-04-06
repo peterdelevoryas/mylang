@@ -7,9 +7,9 @@ use std::ops::Deref;
 use std::ptr;
 
 macro_rules! cstr {
-    ($s:expr) => ({
+    ($s:expr) => {{
         concat!($s, "\0").as_ptr() as *const i8
-    })
+    }};
 }
 
 pub unsafe fn build(module: &Module2) -> LLVMModuleRef {
@@ -95,10 +95,7 @@ pub unsafe fn emit_object(llmodule: LLVMModuleRef) {
     }
 }
 
-unsafe fn build_consts(
-    types: &TypeBuilder,
-    consts: &[Const]
-) -> Vec<LLVMValueRef> {
+unsafe fn build_consts(types: &TypeBuilder, consts: &[Const]) -> Vec<LLVMValueRef> {
     let mut b = ConstBuilder {
         consts: vec![None; consts.len()],
         types: types,
@@ -490,7 +487,12 @@ impl<'a> StmtBuilder<'a> {
         }
     }
 
-    unsafe fn build_call(&mut self, func: &Expr, args: &[Expr], sret: Option<LLVMValueRef>) -> LLVMValueRef {
+    unsafe fn build_call(
+        &mut self,
+        func: &Expr,
+        args: &[Expr],
+        sret: Option<LLVMValueRef>,
+    ) -> LLVMValueRef {
         let fnty = match self.tybld.irtype(func.ty) {
             &Type::Func(_) => func.ty,
             &Type::Pointer(fnty) => fnty,
@@ -511,7 +513,14 @@ impl<'a> StmtBuilder<'a> {
         if let Some(sret) = sret {
             args2.push(sret);
         }
-        LLVMBuildCall2(self.bld, fnty, func, args2.as_mut_ptr(), args2.len() as u32, cstr!(""))
+        LLVMBuildCall2(
+            self.bld,
+            fnty,
+            func,
+            args2.as_mut_ptr(),
+            args2.len() as u32,
+            cstr!(""),
+        )
     }
 
     unsafe fn build_unit(&mut self, e: &Expr) {
@@ -551,7 +560,8 @@ impl<'a> StmtBuilder<'a> {
                     let mut idxs = [z, i];
                     let idxs_ptr = idxs.as_mut_ptr();
                     let idxs_len = idxs.len() as u32;
-                    let dst = LLVMBuildInBoundsGEP2(self.bld, aty, dst, idxs_ptr, idxs_len, cstr!(""));
+                    let dst =
+                        LLVMBuildInBoundsGEP2(self.bld, aty, dst, idxs_ptr, idxs_len, cstr!(""));
                     let _ = self.build_expr(e, Some(dst));
                 }
             }
@@ -616,12 +626,8 @@ impl<'a> StmtBuilder<'a> {
                 let p = self.locals[*i];
                 LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
             }
-            ExprKind::Param(i) => {
-                LLVMGetParam(self.llfunc, *i as u32)
-            }
-            ExprKind::Func(i) => {
-                self.llfuncs[*i]
-            }
+            ExprKind::Param(i) => LLVMGetParam(self.llfunc, *i as u32),
+            ExprKind::Func(i) => self.llfuncs[*i],
             ExprKind::Binary(op, x, y) => {
                 let irty = self.tybld.irtype(x.ty);
                 let kind = irty.scalar_kind();
@@ -649,9 +655,7 @@ impl<'a> StmtBuilder<'a> {
                         LLVMBuildGEP2(self.bld, elem, x, pidx, nidx, cstr!(""))
                     }
 
-                    (Binop::Sub, Pointer) => {
-                        LLVMBuildPtrDiff(self.bld, x, y, cstr!(""))
-                    }
+                    (Binop::Sub, Pointer) => LLVMBuildPtrDiff(self.bld, x, y, cstr!("")),
 
                     (Binop::Cmp(pred), _) => {
                         let pred = match (pred, kind) {
@@ -692,47 +696,52 @@ impl<'a> StmtBuilder<'a> {
                 let ptr = s.as_ptr() as *const i8;
                 LLVMBuildGlobalStringPtr(self.bld, ptr, cstr!(""))
             }
-            ExprKind::Call(func, args) => {
-                self.build_call(func, args, None)
-            }
+            ExprKind::Call(func, args) => self.build_call(func, args, None),
             ExprKind::Cast(e, ty) => {
                 let dst_ty = self.tybld.irtype(*ty);
                 let src_ty = self.tybld.irtype(e.ty);
                 let dst_llty = self.tybld.lltype(*ty);
                 let v = self.build_scalar(e);
                 match (src_ty, dst_ty) {
-                    (Type::I8, Type::I8) | (Type::I16, Type::I16) |
-                    (Type::I32, Type::I32) | (Type::I64, Type::I64) |
-                    (Type::F32, Type::F32) | (Type::F64, Type::F64) => v,
+                    (Type::I8, Type::I8)
+                    | (Type::I16, Type::I16)
+                    | (Type::I32, Type::I32)
+                    | (Type::I64, Type::I64)
+                    | (Type::F32, Type::F32)
+                    | (Type::F64, Type::F64) => v,
 
-                    (Type::I8, Type::I16) | (Type::I8, Type::I32) |
-                    (Type::I8, Type::I64) | (Type::I16, Type::I32) |
-                    (Type::I16, Type::I64) | (Type::I32, Type::I64) => {
-                        LLVMBuildSExt(self.bld, v, dst_llty, cstr!(""))
+                    (Type::I8, Type::I16)
+                    | (Type::I8, Type::I32)
+                    | (Type::I8, Type::I64)
+                    | (Type::I16, Type::I32)
+                    | (Type::I16, Type::I64)
+                    | (Type::I32, Type::I64) => LLVMBuildSExt(self.bld, v, dst_llty, cstr!("")),
+
+                    (Type::I64, Type::I32)
+                    | (Type::I64, Type::I16)
+                    | (Type::I64, Type::I8)
+                    | (Type::I32, Type::I16)
+                    | (Type::I32, Type::I8)
+                    | (Type::I16, Type::I8) => LLVMBuildTrunc(self.bld, v, dst_llty, cstr!("")),
+
+                    (Type::I32, Type::F32) | (Type::I32, Type::F64) => {
+                        LLVMBuildSIToFP(self.bld, v, dst_llty, cstr!(""))
                     }
-
-                    (Type::I64, Type::I32) | (Type::I64, Type::I16) |
-                    (Type::I64, Type::I8) | (Type::I32, Type::I16) |
-                    (Type::I32, Type::I8) | (Type::I16, Type::I8) => {
-                        LLVMBuildTrunc(self.bld, v, dst_llty, cstr!(""))
-                    }
-
-                    (Type::I32, Type::F32) | (Type::I32, Type::F64) => LLVMBuildSIToFP(self.bld, v, dst_llty, cstr!("")),
                     (Type::F32, Type::I32) => LLVMBuildFPToSI(self.bld, v, dst_llty, cstr!("")),
 
                     (Type::F32, Type::F64) => LLVMBuildFPExt(self.bld, v, dst_llty, cstr!("")),
                     (Type::F64, Type::F32) => LLVMBuildFPTrunc(self.bld, v, dst_llty, cstr!("")),
 
-                    (Type::Pointer(_), Type::Pointer(_)) => LLVMBuildPointerCast(self.bld, v, dst_llty, cstr!("")),
+                    (Type::Pointer(_), Type::Pointer(_)) => {
+                        LLVMBuildPointerCast(self.bld, v, dst_llty, cstr!(""))
+                    }
 
                     (x, y) => unimplemented!("{:?} {:?}", x, y),
                 }
             }
             ExprKind::Bool(true) => LLVMConstInt(LLVMInt1Type(), 1, 0),
             ExprKind::Bool(false) => LLVMConstInt(LLVMInt1Type(), 0, 0),
-            ExprKind::Unary(Unop::AddressOf, e) => {
-                self.build_place(e)
-            }
+            ExprKind::Unary(Unop::AddressOf, e) => self.build_place(e),
             ExprKind::Unary(Unop::Deref, p) => {
                 let lltype = self.tybld.lltype(e.ty);
                 let p = self.build_scalar(p);
@@ -742,9 +751,7 @@ impl<'a> StmtBuilder<'a> {
                 let lltype = self.tybld.lltype(*ty);
                 LLVMSizeOf(lltype)
             }
-            ExprKind::Const(i) => {
-                self.llconsts[*i]
-            }
+            ExprKind::Const(i) => self.llconsts[*i],
             ExprKind::Null => {
                 let lltype = self.tybld.lltype(e.ty);
                 LLVMConstPointerNull(lltype)

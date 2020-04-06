@@ -1,13 +1,13 @@
+use llvm_sys;
 use std::env;
 use std::fmt;
 use std::fs;
 use std::ops::Deref;
 use std::process::exit;
-use llvm_sys;
 
-mod syntax;
 mod ir;
 mod llvm;
+mod syntax;
 
 fn usage() {
     println!(

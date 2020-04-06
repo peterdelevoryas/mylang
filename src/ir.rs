@@ -1,8 +1,8 @@
 use crate::error;
 use crate::intern;
+use crate::print_cursor;
 use crate::syntax;
 use crate::String;
-use crate::print_cursor;
 
 #[derive(Debug, Default)]
 pub struct TypeIntern {
@@ -119,9 +119,7 @@ pub fn build(module: &syntax::Module) -> Module2 {
                 id: func.id,
                 locals: vec![],
                 // FIXME This block is unnecessary.
-                body: Block {
-                    stmts: vec![],
-                },
+                body: Block { stmts: vec![] },
             },
         };
         let body = b.build_body(&func.body);
@@ -157,9 +155,7 @@ impl<'a> FuncBuilder<'a> {
 
     fn build_block(&mut self, block: &syntax::Block) -> Block {
         let scope = self.module.names.enter_scope();
-        let mut block2 = Block {
-            stmts: vec![],
-        };
+        let mut block2 = Block { stmts: vec![] };
         for stmt in &block.stmts {
             let stmts = self.build_stmt(stmt);
             for stmt in stmts {
@@ -242,12 +238,7 @@ impl<'a> FuncBuilder<'a> {
         vec![stmt]
     }
 
-    fn build_pattern(
-        &mut self,
-        lhs: &syntax::Pattern,
-        ty: TypeId,
-        rhs: Option<Expr>,
-    ) -> Vec<Stmt> {
+    fn build_pattern(&mut self, lhs: &syntax::Pattern, ty: TypeId, rhs: Option<Expr>) -> Vec<Stmt> {
         let local_id = self.new_local(ty);
         let local = Expr {
             kind: ExprKind::Local(local_id),
@@ -336,7 +327,7 @@ impl<'a> FuncBuilder<'a> {
                     None => panic!("cannot infer type of null"),
                 };
                 match self.module.types.get(ty) {
-                    Type::Pointer(_) => {},
+                    Type::Pointer(_) => {}
                     ty => panic!("expected {:?}, got null", ty),
                 };
                 (ExprKind::Null, ty)
@@ -363,7 +354,7 @@ impl<'a> FuncBuilder<'a> {
                         Some(ty) => match self.module.types.get(ty) {
                             Type::Pointer(ty) => Some(*ty),
                             _ => panic!("address-of expression should have pointer type"),
-                        }
+                        },
                         None => None,
                     };
                     let e = self.build_expr(e, env);
@@ -383,7 +374,7 @@ impl<'a> FuncBuilder<'a> {
                     (ExprKind::Unary(Unop::Deref, e.into()), ty)
                 }
                 op => unimplemented!("unary operator {:?}", op),
-            }
+            },
             syntax::ExprKind::Bool(b) => {
                 let bool = self.module.types.intern(Type::Bool);
                 (ExprKind::Bool(*b), bool)
@@ -574,7 +565,7 @@ impl<'a> FuncBuilder<'a> {
                     (ScalarKind::Pointer, Binop::Sub) => x.ty,
                     (ScalarKind::Pointer, Binop::Cmp(_)) => x.ty,
                     (ScalarKind::Pointer, op) => panic!("pointer not allowed in {:?} expr", op),
-                     _ => x.ty,
+                    _ => x.ty,
                 };
                 let y = self.build_expr(y, Some(y_ty));
                 let ty = match op {
@@ -767,7 +758,11 @@ impl ModuleBuilder {
                 }
                 let ret = self.build_type(&func.ret);
                 let var_args = func.var_args;
-                let func = FuncType { params, ret, var_args };
+                let func = FuncType {
+                    params,
+                    ret,
+                    var_args,
+                };
                 let func = Type::Func(func);
                 self.types.intern(func)
             }

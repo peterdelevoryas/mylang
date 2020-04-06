@@ -925,7 +925,11 @@ impl<'a> Parser<'a> {
                     _ => Type::Unit,
                 };
 
-                let ty = FuncType { params, ret, var_args };
+                let ty = FuncType {
+                    params,
+                    ret,
+                    var_args,
+                };
                 Type::Func(ty.into())
             }
             LPARENS => {
