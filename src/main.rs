@@ -135,12 +135,12 @@ fn main() {
     let module = syntax::parse(text);
     let module = ir::build(&module);
     unsafe {
-        let module = llvm::build(&module);
+        let (machine, module) = llvm::build(&module);
         if args.print_llvm {
             llvm_sys::LLVMDumpModule(module);
         }
         llvm::verify(module);
-        llvm::emit_object(module);
+        llvm::emit_object(machine, module);
     }
     ld("a.o", "a.out");
     let _ = fs::remove_file("a.o");

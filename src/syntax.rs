@@ -65,6 +65,7 @@ pub fn parse(text: &str) -> Module {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    ENUM,
     BREAK,
     CONTINUE,
     NULL,
@@ -137,7 +138,14 @@ pub struct TypeDecl {
 #[derive(Debug, Clone)]
 pub enum TypeDeclKind {
     Struct(Vec<(String, Type)>),
+    Enum(Vec<EnumVariant>),
     Alias(Type),
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: String,
+    pub args: Vec<Type>,
 }
 
 #[derive(Debug, Clone)]
@@ -320,6 +328,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"enum" => ENUM,
                     b"break" => BREAK,
                     b"continue" => CONTINUE,
                     b"null" => NULL,
@@ -405,11 +414,46 @@ impl<'a> Parser<'a> {
         ConstDecl { name, ty, value }
     }
 
+    fn parse_enum_variant(&mut self) -> EnumVariant {
+        let name = self.token_string();
+        self.parse(NAME);
+        if self.token != LPARENS {
+            return EnumVariant { name, args: vec![], };
+        }
+        self.next();
+        let mut args = vec![];
+        while self.token != RPARENS {
+            let arg = self.parse_type();
+            args.push(arg);
+            if self.token != COMMA {
+                break;
+            }
+            self.next();
+        }
+        self.parse(RPARENS);
+        EnumVariant { name, args }
+    }
+
     pub fn parse_type_decl(&mut self) -> TypeDecl {
         self.parse(TYPE);
         let name = self.token_string();
         self.parse(NAME);
         let kind = match self.token {
+            ENUM => {
+                self.next();
+                self.parse(LBRACE);
+                let mut variants = vec![];
+                while self.token != RBRACE {
+                    let variant = self.parse_enum_variant();
+                    variants.push(variant);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RBRACE);
+                TypeDeclKind::Enum(variants)
+            }
             STRUCT => {
                 self.next();
                 self.parse(LBRACE);

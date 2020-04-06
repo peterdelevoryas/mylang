@@ -12,45 +12,7 @@ macro_rules! cstr {
     }};
 }
 
-pub unsafe fn build(module: &Module2) -> LLVMModuleRef {
-    let llmodule = LLVMModuleCreateWithName(cstr!("a"));
-
-    let b = LLVMCreateBuilder();
-    let type_bld = &TypeBuilder::new(&module.types);
-    let llconsts = &build_consts(type_bld, &module.consts);
-
-    let mut llfuncs = vec![];
-    for func_decl in &module.func_decls {
-        let lltype = type_bld.func_type(&func_decl.ty);
-        let mut name = func_decl.name.deref().to_string();
-        name.push('\0');
-        let mut link_name = name.as_ptr() as *const i8;
-        if cfg!(target_os = "macos") && name == "readdir\0" {
-            link_name = "readdir$INODE64\0".as_ptr() as *const i8;
-        }
-        let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
-        llfuncs.push(llfunc);
-    }
-    let llfuncs = &llfuncs;
-
-    for func_body in &module.func_bodys {
-        let func_decl = &module.func_decls[func_body.id];
-        build_func_body(b, type_bld, llfuncs, llconsts, func_decl, func_body);
-    }
-
-    llmodule
-}
-
-pub unsafe fn verify(llmodule: LLVMModuleRef) {
-    let mut msg = ptr::null_mut();
-    LLVMVerifyModule(
-        llmodule,
-        LLVMVerifierFailureAction_LLVMAbortProcessAction,
-        &mut msg,
-    );
-}
-
-pub unsafe fn emit_object(llmodule: LLVMModuleRef) {
+pub unsafe fn build(module: &Module2) -> (LLVMTargetMachineRef, LLVMModuleRef) {
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
@@ -77,9 +39,47 @@ pub unsafe fn emit_object(llmodule: LLVMModuleRef) {
         LLVMCodeModel_LLVMCodeModelDefault,
     );
     let layout = LLVMCreateTargetDataLayout(machine);
+
+    let llmodule = LLVMModuleCreateWithName(cstr!("a"));
     LLVMSetModuleDataLayout(llmodule, layout);
     LLVMSetTarget(llmodule, triple);
 
+    let b = LLVMCreateBuilder();
+    let type_bld = &TypeBuilder::new(layout, &module.types);
+    let llconsts = &build_consts(type_bld, &module.consts);
+
+    let mut llfuncs = vec![];
+    for func_decl in &module.func_decls {
+        let lltype = type_bld.func_type(&func_decl.ty);
+        let mut name = func_decl.name.deref().to_string();
+        name.push('\0');
+        let mut link_name = name.as_ptr() as *const i8;
+        if cfg!(target_os = "macos") && name == "readdir\0" {
+            link_name = "readdir$INODE64\0".as_ptr() as *const i8;
+        }
+        let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
+        llfuncs.push(llfunc);
+    }
+    let llfuncs = &llfuncs;
+
+    for func_body in &module.func_bodys {
+        let func_decl = &module.func_decls[func_body.id];
+        build_func_body(b, type_bld, llfuncs, llconsts, func_decl, func_body);
+    }
+
+    (machine, llmodule)
+}
+
+pub unsafe fn verify(llmodule: LLVMModuleRef) {
+    let mut msg = ptr::null_mut();
+    LLVMVerifyModule(
+        llmodule,
+        LLVMVerifierFailureAction_LLVMAbortProcessAction,
+        &mut msg,
+    );
+}
+
+pub unsafe fn emit_object(machine: LLVMTargetMachineRef, llmodule: LLVMModuleRef) {
     let mut msg = ptr::null_mut();
     if LLVMTargetMachineEmitToFile(
         machine,
@@ -132,13 +132,15 @@ impl<'a> ConstBuilder<'a> {
 }
 
 struct TypeBuilder<'a> {
+    layout: LLVMTargetDataRef,
     lltypes: Vec<LLVMTypeRef>,
     types: &'a [Type],
 }
 
 impl<'a> TypeBuilder<'a> {
-    unsafe fn new(types: &'a [Type]) -> Self {
+    unsafe fn new(layout: LLVMTargetDataRef, types: &'a [Type]) -> Self {
         let mut b = TypeBuilder {
+            layout: layout,
             lltypes: vec![],
             types: types,
         };
@@ -149,6 +151,9 @@ impl<'a> TypeBuilder<'a> {
         for (id, ty) in types.iter().enumerate() {
             if let Type::Struct(sty) = ty {
                 b.set_struct_body(id, sty);
+            }
+            if let Type::Enum(ety) = ty {
+                b.set_enum_body(id, ety);
             }
         }
         b
@@ -189,6 +194,12 @@ impl<'a> TypeBuilder<'a> {
                 }
                 LLVMStructType(ll_elem_tys.as_mut_ptr(), ll_elem_tys.len() as u32, 0)
             }
+            Type::Enum(ety) => {
+                let mut name = ety.name.to_string();
+                name.push('\0');
+                let name = name.as_ptr() as *const i8;
+                LLVMStructCreateNamed(LLVMGetGlobalContext(), name)
+            }
         }
     }
 
@@ -200,6 +211,37 @@ impl<'a> TypeBuilder<'a> {
             elem_types.push(ty);
         }
         LLVMStructSetBody(lltype, elem_types.as_mut_ptr(), elem_types.len() as u32, 0);
+    }
+
+    unsafe fn set_enum_body(&self, id: TypeId, ety: &EnumType) {
+        let enum_struct = self.lltype(id);
+        let tag_type = LLVMInt8Type();
+
+        // Create struct types for each variant.
+        let mut largest: Option<(u64, LLVMTypeRef)> = None;
+        for variant in &ety.variants {
+            let mut args = vec![];
+            for &arg in &variant.args {
+                let ty = self.build_type(arg);
+                args.push(ty);
+            }
+            let p = args.as_mut_ptr();
+            let n = args.len() as u32;
+            let ty = LLVMStructType(p, n, 0);
+            let size = LLVMStoreSizeOfType(self.layout, ty);
+
+            largest = match largest {
+                Some((n, other)) if n >= size => Some((n, other)),
+                _ => Some((size, ty)),
+            };
+        }
+        let mut fields = match largest {
+            Some((_, ty)) => vec![ty, tag_type],
+            _ => vec![tag_type],
+        };
+        let p = fields.as_mut_ptr();
+        let n = fields.len() as u32;
+        LLVMStructSetBody(enum_struct, p, n, 0);
     }
 
     fn irtype(&self, ty: TypeId) -> &'a Type {
@@ -577,7 +619,50 @@ impl<'a> StmtBuilder<'a> {
                 let p = self.build_scalar(p);
                 self.copy(e.ty, p, dst);
             }
-            _ => {
+            &ExprKind::EnumCall(variant, ref args) => {
+                let ety = self.tybld.lltype(e.ty);
+                let tag_index: u32 = if args.len() == 0 { 0 } else { 1 };
+                let tag_ptr = LLVMBuildStructGEP2(self.bld, ety, dst, tag_index, cstr!(""));
+                let tag_value = LLVMConstInt(LLVMInt8Type(), variant as u64, 0);
+                LLVMBuildStore(self.bld, tag_value, tag_ptr);
+                // No body, skip setting args
+                if args.len() == 0 {
+                    return;
+                }
+                let variant_ty = {
+                    let enty = match self.tybld.irtype(e.ty) {
+                        Type::Enum(enty) => enty,
+                        _ => panic!(),
+                    };
+                    let mut xargs = vec![];
+                    for &arg in &enty.variants[variant as usize].args {
+                        let ty = self.tybld.lltype(arg);
+                        xargs.push(ty);
+                    }
+                    let p = xargs.as_mut_ptr();
+                    let n = xargs.len() as u32;
+                    LLVMStructType(p, n, 0)
+                };
+                let body_ptr = LLVMBuildStructGEP2(self.bld, ety, dst, 0, cstr!(""));
+                let variant_ptr = LLVMBuildPointerCast(self.bld, body_ptr, LLVMPointerType(variant_ty, 0), cstr!(""));
+                for (i, arg) in args.iter().enumerate() {
+                    let i = i as u32;
+                    let arg_ptr = LLVMBuildStructGEP2(self.bld, variant_ty, variant_ptr, i, cstr!(""));
+                    let _ = self.build_expr(arg, Some(arg_ptr));
+                }
+            }
+            ExprKind::Null | ExprKind::Unit
+            | ExprKind::Integer(_) | ExprKind::Float(_)
+            | ExprKind::Func(_) | ExprKind::Type(_)
+            | ExprKind::Unary(_, _) | ExprKind::Binary(_, _, _)
+            | ExprKind::String(_) | ExprKind::Cast(_, _)
+            | ExprKind::Bool(_) | ExprKind::Char(_)
+            | ExprKind::Sizeof(_) | ExprKind::EnumVariant(_) => {
+                panic!("got scalar expression in aggregate place");
+            }
+            ExprKind::Const(_) => unimplemented!(),
+            ExprKind::Field(_, _) | ExprKind::Index(_, _)
+            | ExprKind::Local(_) => {
                 let p = self.build_place(e);
                 self.copy(e.ty, p, dst);
             }

@@ -282,6 +282,24 @@ impl<'a> FuncBuilder<'a> {
     }
 
     fn build_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
+        let x = self.infer_expr(e, env);
+        if let Some(env) = env {
+            if x.ty != env {
+                let start = e.span.0 as usize;
+                let end = e.span.1 as usize;
+                print_cursor(self.text, start, end);
+                println!(
+                    "expected {:?}, got {:?}",
+                    self.module.types.get(env),
+                    self.module.types.get(x.ty)
+                );
+                error();
+            }
+        }
+        x
+    }
+
+    fn infer_expr(&mut self, e: &syntax::Expr, env: Option<TypeId>) -> Expr {
         let (kind, ty) = match &e.kind {
             &syntax::ExprKind::TupleField(ref tuple, i) => {
                 let tuple = self.build_expr(tuple, None);
@@ -384,18 +402,34 @@ impl<'a> FuncBuilder<'a> {
                 let ty = self.module.build_type(ty);
                 (ExprKind::Cast(e.into(), ty), ty)
             }
-            syntax::ExprKind::Field(e, field_name) => {
+            &syntax::ExprKind::Field(ref e, field_name) => {
                 let e = self.build_expr(e, None);
-                let sty = match self.module.types.auto_deref(e.ty) {
-                    Type::Struct(sty) => sty,
+                match self.module.types.auto_deref(e.ty) {
+                    Type::Struct(sty) => {
+                        let i = match sty.field_index(field_name) {
+                            Some(i) => i,
+                            None => panic!("field {:?} not found on struct {:?}", field_name, sty.name),
+                        };
+                        let ty = sty.fields[i].1;
+                        (ExprKind::Field(e.into(), i as u32), ty)
+                    }
+                    Type::Enum(ety) => {
+                        let mut i = None;
+                        for (j, variant) in ety.variants.iter().enumerate() {
+                            if field_name == variant.name {
+                                i = Some(j);
+                                break;
+                            }
+                        }
+                        let i = match i {
+                            Some(i) => i,
+                            None => panic!("enum variant {:?} not found on enum type {:?}", field_name, ety.name),
+                        };
+                        let i = i as u32;
+                        (ExprKind::EnumVariant(i), e.ty)
+                    }
                     _ => panic!(),
-                };
-                let i = match sty.field_index(*field_name) {
-                    Some(i) => i,
-                    None => panic!("field {:?} not found on struct {:?}", field_name, sty.name),
-                };
-                let ty = sty.fields[i].1;
-                (ExprKind::Field(e.into(), i as u32), ty)
+                }
             }
             syntax::ExprKind::Struct(fields) => {
                 let ty = match env {
@@ -451,6 +485,28 @@ impl<'a> FuncBuilder<'a> {
             syntax::ExprKind::Unit => (ExprKind::Unit, self.module.types.intern(Type::Unit)),
             syntax::ExprKind::Call(func, args) => {
                 let func = self.build_expr(func, None);
+                if let ExprKind::EnumVariant(i) = func.kind {
+                    let variant = match self.module.types.get(func.ty) {
+                        Type::Enum(ety) => ety.variants[i as usize].clone(),
+                        _ => panic!(),
+                    };
+                    let mut xargs = vec![];
+                    if args.len() != variant.args.len() {
+                        let start = e.span.0 as usize;
+                        let end = e.span.1 as usize;
+                        print_cursor(self.text, start, end);
+                        println!("enum variant {:?} has {:?} args, got {:?}", variant.name, variant.args.len(), args.len());
+                        error();
+                    }
+                    for (arg, &ty) in args.iter().zip(&variant.args) {
+                        let arg = self.build_expr(arg, Some(ty));
+                        xargs.push(arg);
+                    }
+                    let kind = ExprKind::EnumCall(i, xargs);
+                    let ty = func.ty;
+                    return Expr { kind, ty };
+                }
+
                 let mut args2 = vec![];
 
                 // Infer function type.
@@ -462,12 +518,6 @@ impl<'a> FuncBuilder<'a> {
                     },
                     _ => panic!(),
                 };
-                // Verify return type matches environment type.
-                if let Some(ret) = env {
-                    if fnty.ret != ret {
-                        panic!("return type doesn't match");
-                    }
-                }
                 // Account for method call arg
                 let params = &fnty.params[args2.len()..];
                 // Verify number of call args count.
@@ -580,7 +630,7 @@ impl<'a> FuncBuilder<'a> {
                         let ty = self.module.func_decls[self.body.id].ty.params[i];
                         (ExprKind::Param(i), ty)
                     }
-                    Def::Type(_) => panic!("encountered type in expression {:?}", name),
+                    Def::Type(id) => (ExprKind::Type(id), id),
                     Def::Const(i) => {
                         let ty = self.module.consts[i].expr.ty;
                         (ExprKind::Const(i), ty)
@@ -588,19 +638,6 @@ impl<'a> FuncBuilder<'a> {
                 },
             },
         };
-        if let Some(env) = env {
-            if ty != env {
-                let start = e.span.0 as usize;
-                let end = e.span.1 as usize;
-                print_cursor(self.text, start, end);
-                println!(
-                    "expected {:?}, got {:?}",
-                    self.module.types.get(env),
-                    self.module.types.get(ty)
-                );
-                error();
-            }
-        }
         Expr { kind, ty }
     }
 }
@@ -667,6 +704,26 @@ impl ModuleBuilder {
 
     fn add_type_decl(&mut self, type_decl: &syntax::TypeDecl) {
         let ty = match &type_decl.kind {
+            syntax::TypeDeclKind::Enum(variants) => {
+                let mut xvariants = vec![];
+                for variant in variants {
+                    let mut args = vec![];
+                    for arg in &variant.args {
+                        let arg = self.build_type(arg);
+                        args.push(arg);
+                    }
+                    let variant = EnumVariant {
+                        name: variant.name,
+                        args: args,
+                    };
+                    xvariants.push(variant);
+                }
+                let ty = EnumType {
+                    name: type_decl.name,
+                    variants: xvariants,
+                };
+                self.types.intern(Type::Enum(ty))
+            }
             syntax::TypeDeclKind::Struct(fields) => {
                 let mut fields2 = vec![];
                 for (name, ty) in fields {
@@ -770,6 +827,7 @@ pub enum Type {
     Struct(StructType),
     Tuple(Vec<TypeId>),
     Array(TypeId, u32),
+    Enum(EnumType),
     Unit,
     Bool,
 }
@@ -790,6 +848,7 @@ impl Type {
             Type::Struct(_) => TypeKind::Aggregate,
             Type::Array(_, _) => TypeKind::Aggregate,
             Type::Tuple(_) => TypeKind::Aggregate,
+            Type::Enum(_) => TypeKind::Aggregate,
         }
     }
 
@@ -808,6 +867,7 @@ impl Type {
             Type::Struct(_) => panic!(),
             Type::Array(_, _) => panic!(),
             Type::Tuple(_) => panic!(),
+            Type::Enum(_) => panic!(),
         }
     }
 }
@@ -824,6 +884,18 @@ pub enum TypeKind {
     Aggregate,
     Unit,
     Scalar,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumType {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
+    pub args: Vec<TypeId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -928,6 +1000,7 @@ pub enum ExprKind {
     Param(ParamId),
     Func(FuncId),
     Local(LocalId),
+    Type(TypeId),
     Unary(Unop, Box<Expr>),
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
@@ -941,4 +1014,6 @@ pub enum ExprKind {
     Bool(bool),
     Char(u8),
     Sizeof(TypeId),
+    EnumVariant(u32),
+    EnumCall(u32, Vec<Expr>),
 }
