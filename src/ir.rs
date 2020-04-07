@@ -238,6 +238,40 @@ impl<'a> FuncBuilder<'a> {
         vec![stmt]
     }
 
+    fn build_tuple_pattern(&mut self, pats: &[syntax::Pattern], tys: &[TypeId], rhs: Expr) -> Vec<Stmt> {
+        let mut assigns = vec![];
+        assert_eq!(pats.len(), tys.len());
+        for (i, (elem, &ty)) in pats.iter().zip(tys).enumerate() {
+            let i = i as u32;
+            let field = Expr {
+                kind: ExprKind::Field(rhs.clone().into(), i),
+                ty: ty,
+            };
+            let stmts = self.build_pattern(elem, ty, Some(field));
+            for stmt in stmts {
+                assigns.push(stmt);
+            }
+        }
+        assigns
+    }
+
+    fn build_enum_pattern(&mut self, variant: u32, pats: &[syntax::Pattern], tys: &[TypeId], rhs: Expr) -> Vec<Stmt> {
+        let mut assigns = vec![];
+        assert_eq!(pats.len(), tys.len());
+        for (i, (elem, &ty)) in pats.iter().zip(tys).enumerate() {
+            let i = i as u32;
+            let field = Expr {
+                kind: ExprKind::EnumField(rhs.clone().into(), variant, i),
+                ty: ty,
+            };
+            let stmts = self.build_pattern(elem, ty, Some(field));
+            for stmt in stmts {
+                assigns.push(stmt);
+            }
+        }
+        assigns
+    }
+
     fn build_pattern(&mut self, lhs: &syntax::Pattern, ty: TypeId, rhs: Option<Expr>) -> Vec<Stmt> {
         let local_id = self.new_local(ty);
         let local = Expr {
@@ -249,6 +283,19 @@ impl<'a> FuncBuilder<'a> {
             assigns.push(Stmt::Assign(local.clone(), e));
         }
         match lhs {
+            &syntax::Pattern::EnumVariant(name, ref elems) => {
+                let (i, elem_tys) = match self.module.types.get(ty) {
+                    Type::Enum(ety) => {
+                        let (i, variant) = ety.variant(name).unwrap();
+                        (i, variant.args.clone())
+                    }
+                    _ => panic!(),
+                };
+                let stmts = self.build_enum_pattern(i, elems, &elem_tys, local);
+                for stmt in stmts {
+                    assigns.push(stmt);
+                }
+            }
             &syntax::Pattern::Name(name) => {
                 self.module.names.def(name, Def::Local(local_id));
             }
@@ -258,17 +305,9 @@ impl<'a> FuncBuilder<'a> {
                     Type::Tuple(elem_tys) => elem_tys.clone(),
                     _ => panic!("tuple pattern doesn't have tuple type"),
                 };
-                assert_eq!(elems.len(), elem_tys.len());
-                for (i, (elem, ty)) in elems.iter().zip(elem_tys).enumerate() {
-                    let i = i as u32;
-                    let field = Expr {
-                        kind: ExprKind::Field(local.clone().into(), i),
-                        ty: ty,
-                    };
-                    let stmts = self.build_pattern(elem, ty, Some(field));
-                    for stmt in stmts {
-                        assigns.push(stmt);
-                    }
+                let stmts = self.build_tuple_pattern(elems, &elem_tys, local);
+                for stmt in stmts {
+                    assigns.push(stmt);
                 }
             }
         }
@@ -408,7 +447,9 @@ impl<'a> FuncBuilder<'a> {
                     Type::Struct(sty) => {
                         let i = match sty.field_index(field_name) {
                             Some(i) => i,
-                            None => panic!("field {:?} not found on struct {:?}", field_name, sty.name),
+                            None => {
+                                panic!("field {:?} not found on struct {:?}", field_name, sty.name)
+                            }
                         };
                         let ty = sty.fields[i].1;
                         (ExprKind::Field(e.into(), i as u32), ty)
@@ -423,7 +464,10 @@ impl<'a> FuncBuilder<'a> {
                         }
                         let i = match i {
                             Some(i) => i,
-                            None => panic!("enum variant {:?} not found on enum type {:?}", field_name, ety.name),
+                            None => panic!(
+                                "enum variant {:?} not found on enum type {:?}",
+                                field_name, ety.name
+                            ),
                         };
                         let i = i as u32;
                         (ExprKind::EnumVariant(i), e.ty)
@@ -495,7 +539,12 @@ impl<'a> FuncBuilder<'a> {
                         let start = e.span.0 as usize;
                         let end = e.span.1 as usize;
                         print_cursor(self.text, start, end);
-                        println!("enum variant {:?} has {:?} args, got {:?}", variant.name, variant.args.len(), args.len());
+                        println!(
+                            "enum variant {:?} has {:?} args, got {:?}",
+                            variant.name,
+                            variant.args.len(),
+                            args.len()
+                        );
                         error();
                     }
                     for (arg, &ty) in args.iter().zip(&variant.args) {
@@ -898,6 +947,18 @@ pub struct EnumVariant {
     pub args: Vec<TypeId>,
 }
 
+impl EnumType {
+    pub fn variant(&self, name: String) -> Option<(u32, &EnumVariant)> {
+        for (i, variant) in self.variants.iter().enumerate() {
+            if variant.name == name {
+                let i = i as u32;
+                return Some((i, variant));
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructType {
     pub name: String,
@@ -1016,4 +1077,6 @@ pub enum ExprKind {
     Sizeof(TypeId),
     EnumVariant(u32),
     EnumCall(u32, Vec<Expr>),
+    // target, enum variant, field index
+    EnumField(Box<Expr>, u32, u32),
 }

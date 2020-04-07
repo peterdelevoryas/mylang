@@ -191,6 +191,7 @@ pub struct Block {
 pub enum Pattern {
     Name(String),
     Tuple(Vec<Pattern>),
+    EnumVariant(String, Vec<Pattern>),
 }
 
 #[derive(Debug, Clone)]
@@ -418,7 +419,7 @@ impl<'a> Parser<'a> {
         let name = self.token_string();
         self.parse(NAME);
         if self.token != LPARENS {
-            return EnumVariant { name, args: vec![], };
+            return EnumVariant { name, args: vec![] };
         }
         self.next();
         let mut args = vec![];
@@ -559,7 +560,23 @@ impl<'a> Parser<'a> {
             NAME => {
                 let name = self.token_string();
                 self.next();
-                Pattern::Name(name)
+
+                if self.token != LPARENS {
+                    return Pattern::Name(name);
+                }
+                self.next();
+                let mut elems = vec![];
+                while self.token != RPARENS {
+                    let elem = self.parse_pattern();
+                    elems.push(elem);
+                    if self.token != COMMA {
+                        break;
+                    }
+                    self.next();
+                }
+                self.parse(RPARENS);
+
+                Pattern::EnumVariant(name, elems)
             }
             LPARENS => {
                 self.next();

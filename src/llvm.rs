@@ -498,6 +498,32 @@ impl<'a> StmtBuilder<'a> {
             }
             ExprKind::Unary(Unop::Deref, p) => self.build_scalar(p),
             &ExprKind::Func(i) => self.llfuncs[i],
+            &ExprKind::EnumField(ref x, variant, i) => {
+                let enty = match self.tybld.irtype(x.ty) {
+                    Type::Enum(enty) => enty,
+                    _ => panic!(),
+                };
+                let variant_ty = {
+                    let mut xargs = vec![];
+                    for &arg in &enty.variants[variant as usize].args {
+                        let ty = self.tybld.lltype(arg);
+                        xargs.push(ty);
+                    }
+                    let p = xargs.as_mut_ptr();
+                    let n = xargs.len() as u32;
+                    LLVMStructType(p, n, 0)
+                };
+                let ety = self.tybld.lltype(x.ty);
+                let enum_ptr = self.build_place(x);
+                let body_ptr = LLVMBuildStructGEP2(self.bld, ety, enum_ptr, 0, cstr!(""));
+                let variant_ptr = LLVMBuildPointerCast(
+                    self.bld,
+                    body_ptr,
+                    LLVMPointerType(variant_ty, 0),
+                    cstr!(""),
+                );
+                LLVMBuildStructGEP2(self.bld, variant_ty, variant_ptr, i, cstr!(""))
+            }
             k => unimplemented!("build place {:?}", k),
         }
     }
@@ -644,25 +670,41 @@ impl<'a> StmtBuilder<'a> {
                     LLVMStructType(p, n, 0)
                 };
                 let body_ptr = LLVMBuildStructGEP2(self.bld, ety, dst, 0, cstr!(""));
-                let variant_ptr = LLVMBuildPointerCast(self.bld, body_ptr, LLVMPointerType(variant_ty, 0), cstr!(""));
+                let variant_ptr = LLVMBuildPointerCast(
+                    self.bld,
+                    body_ptr,
+                    LLVMPointerType(variant_ty, 0),
+                    cstr!(""),
+                );
                 for (i, arg) in args.iter().enumerate() {
                     let i = i as u32;
-                    let arg_ptr = LLVMBuildStructGEP2(self.bld, variant_ty, variant_ptr, i, cstr!(""));
+                    let arg_ptr =
+                        LLVMBuildStructGEP2(self.bld, variant_ty, variant_ptr, i, cstr!(""));
                     let _ = self.build_expr(arg, Some(arg_ptr));
                 }
             }
-            ExprKind::Null | ExprKind::Unit
-            | ExprKind::Integer(_) | ExprKind::Float(_)
-            | ExprKind::Func(_) | ExprKind::Type(_)
-            | ExprKind::Unary(_, _) | ExprKind::Binary(_, _, _)
-            | ExprKind::String(_) | ExprKind::Cast(_, _)
-            | ExprKind::Bool(_) | ExprKind::Char(_)
-            | ExprKind::Sizeof(_) | ExprKind::EnumVariant(_) => {
+            ExprKind::EnumField(_, _, _) => {
+                println!("enum field type {:?}", self.tybld.irtype(e.ty));
+                unimplemented!()
+            }
+            ExprKind::Null
+            | ExprKind::Unit
+            | ExprKind::Integer(_)
+            | ExprKind::Float(_)
+            | ExprKind::Func(_)
+            | ExprKind::Type(_)
+            | ExprKind::Unary(_, _)
+            | ExprKind::Binary(_, _, _)
+            | ExprKind::String(_)
+            | ExprKind::Cast(_, _)
+            | ExprKind::Bool(_)
+            | ExprKind::Char(_)
+            | ExprKind::Sizeof(_)
+            | ExprKind::EnumVariant(_) => {
                 panic!("got scalar expression in aggregate place");
             }
             ExprKind::Const(_) => unimplemented!(),
-            ExprKind::Field(_, _) | ExprKind::Index(_, _)
-            | ExprKind::Local(_) => {
+            ExprKind::Field(_, _) | ExprKind::Index(_, _) | ExprKind::Local(_) => {
                 let p = self.build_place(e);
                 self.copy(e.ty, p, dst);
             }
@@ -688,7 +730,7 @@ impl<'a> StmtBuilder<'a> {
 
     unsafe fn build_scalar(&mut self, e: &Expr) -> LLVMValueRef {
         match &e.kind {
-            ExprKind::Index(_, _) | ExprKind::Field(_, _) => {
+            ExprKind::Index(_, _) | ExprKind::Field(_, _) | ExprKind::EnumField(_, _, _) => {
                 let p = self.build_place(e);
                 let elem_type = self.tybld.lltype(e.ty);
                 LLVMBuildLoad2(self.bld, elem_type, p, cstr!(""))
