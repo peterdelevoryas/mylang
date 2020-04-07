@@ -11,16 +11,17 @@ This language is approximately equal to C, but with some essential modern featur
 - Tuples
 - First-class `()` type and value replaces `void`
 - Compile-time constants (replacing macros or static data)
+- Sum types (like Rust `enum`'s)
+- Pattern matching (`if let ...`)
 
 Some more features that I want to add, but haven't finished implementing yet:
 
 - Generics
 - Fat pointer primitive (`ptr` + `len`): `[]T`, like Rust `&[T]` slice type
-- Sum types (like Rust `enum`'s)
-- Pattern matching (like Rust `match`)
 - Module system
 - SIMD primitive types
 - Uniform function call syntax
+- `match` expression (like Rust)
 
 The `filetests/` directory contains examples of all language features, below
 some are reproduced with added comments.

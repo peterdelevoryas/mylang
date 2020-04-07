@@ -199,6 +199,7 @@ pub enum Stmt {
     Let(Pattern, Option<Type>, Option<Expr>),
     Return(Expr),
     Expr(Expr),
+    IfLet(Pattern, Expr, Block),
     If(Expr, Block),
     While(Expr, Block),
     Assign(Expr, Expr),
@@ -628,9 +629,24 @@ impl<'a> Parser<'a> {
             }
             IF => {
                 self.next();
+
+                let pat = match self.token {
+                    LET => {
+                        self.next();
+                        let pat = self.parse_pattern();
+                        self.parse(ASSIGN);
+                        Some(pat)
+                    }
+                    _ => None,
+                };
+
                 let cond = self.parse_expr();
                 let body = self.parse_block();
-                Stmt::If(cond, body)
+
+                match pat {
+                    Some(pat) => Stmt::IfLet(pat, cond, body),
+                    None => Stmt::If(cond, body),
+                }
             }
             LET => {
                 self.next();

@@ -166,8 +166,59 @@ impl<'a> FuncBuilder<'a> {
         block2
     }
 
+    fn build_match_expr(&mut self, pat: &syntax::Pattern, rhs: Expr) -> Option<Expr> {
+        let cond = match pat {
+            syntax::Pattern::Name(_) => return None,
+            syntax::Pattern::Tuple(elems) => unimplemented!(),
+            &syntax::Pattern::EnumVariant(name, ref elems) => {
+                let variant_index = match self.module.types.get(rhs.ty) {
+                    Type::Enum(ety) => ety.variant(name).unwrap().0,
+                    _ => panic!(),
+                };
+                let pattern_tag = Expr {
+                    kind: ExprKind::EnumVariant(variant_index as u32),
+                    ty: self.module.types.intern(Type::I8),
+                };
+                let tag = Expr {
+                    kind: ExprKind::EnumTag(rhs.into()),
+                    ty: self.module.types.intern(Type::I8),
+                };
+                Expr {
+                    kind: ExprKind::Binary(
+                        Binop::Cmp(Predicate::Eq),
+                        pattern_tag.into(),
+                        tag.into(),
+                    ),
+                    ty: self.module.types.intern(Type::Bool),
+                }
+            }
+        };
+        Some(cond)
+    }
+
     fn build_stmt(&mut self, stmt: &syntax::Stmt) -> Vec<Stmt> {
         let stmt = match stmt {
+            syntax::Stmt::IfLet(pat, expr, body) => {
+                let expr = self.build_expr(expr, None);
+                let scope = self.module.names.enter_scope();
+                let tmp_id = self.new_local(expr.ty);
+                let tmp = Expr {
+                    kind: ExprKind::Local(tmp_id),
+                    ty: expr.ty,
+                };
+                let tmp_init = Stmt::Assign(tmp.clone(), expr.clone().into());
+                let mut ret = vec![tmp_init];
+                let cond = self.build_match_expr(pat, tmp.clone()).unwrap();
+                let mut stmts = self.build_pattern(pat, expr.ty, Some(tmp));
+                let body = self.build_block(body);
+                for stmt in body.stmts {
+                    stmts.push(stmt);
+                }
+                let body = Block { stmts };
+                self.module.names.exit_scope(scope);
+                ret.push(Stmt::If(cond, body));
+                return ret;
+            }
             syntax::Stmt::Break => Stmt::Break,
             syntax::Stmt::Continue => Stmt::Continue,
             syntax::Stmt::For(init, cond, post, body) => {
@@ -238,7 +289,12 @@ impl<'a> FuncBuilder<'a> {
         vec![stmt]
     }
 
-    fn build_tuple_pattern(&mut self, pats: &[syntax::Pattern], tys: &[TypeId], rhs: Expr) -> Vec<Stmt> {
+    fn build_tuple_pattern(
+        &mut self,
+        pats: &[syntax::Pattern],
+        tys: &[TypeId],
+        rhs: Expr,
+    ) -> Vec<Stmt> {
         let mut assigns = vec![];
         assert_eq!(pats.len(), tys.len());
         for (i, (elem, &ty)) in pats.iter().zip(tys).enumerate() {
@@ -255,7 +311,13 @@ impl<'a> FuncBuilder<'a> {
         assigns
     }
 
-    fn build_enum_pattern(&mut self, variant: u32, pats: &[syntax::Pattern], tys: &[TypeId], rhs: Expr) -> Vec<Stmt> {
+    fn build_enum_pattern(
+        &mut self,
+        variant: u32,
+        pats: &[syntax::Pattern],
+        tys: &[TypeId],
+        rhs: Expr,
+    ) -> Vec<Stmt> {
         let mut assigns = vec![];
         assert_eq!(pats.len(), tys.len());
         for (i, (elem, &ty)) in pats.iter().zip(tys).enumerate() {
@@ -1079,4 +1141,21 @@ pub enum ExprKind {
     EnumCall(u32, Vec<Expr>),
     // target, enum variant, field index
     EnumField(Box<Expr>, u32, u32),
+    // Read enum tag from expr
+    EnumTag(Box<Expr>),
+}
+
+pub fn print(module: &Module2) {
+    for (i, ty) in module.types.iter().enumerate() {
+        println!("type {:?} = {:?}", i, ty);
+    }
+    for func_decl in &module.func_decls {
+        println!("{:?}", func_decl);
+    }
+    for func_body in &module.func_bodys {
+        println!("{:?}", func_body.locals);
+        for stmt in &func_body.body.stmts {
+            println!("{:?}", stmt);
+        }
+    }
 }

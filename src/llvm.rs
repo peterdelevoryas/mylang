@@ -648,6 +648,9 @@ impl<'a> StmtBuilder<'a> {
             &ExprKind::EnumCall(variant, ref args) => {
                 let ety = self.tybld.lltype(e.ty);
                 let tag_index: u32 = if args.len() == 0 { 0 } else { 1 };
+                // FIXME This is wrong! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                //  This is based on the variant args length. It should be the same index for all
+                //  variants, but its not right now.
                 let tag_ptr = LLVMBuildStructGEP2(self.bld, ety, dst, tag_index, cstr!(""));
                 let tag_value = LLVMConstInt(LLVMInt8Type(), variant as u64, 0);
                 LLVMBuildStore(self.bld, tag_value, tag_ptr);
@@ -700,7 +703,8 @@ impl<'a> StmtBuilder<'a> {
             | ExprKind::Bool(_)
             | ExprKind::Char(_)
             | ExprKind::Sizeof(_)
-            | ExprKind::EnumVariant(_) => {
+            | ExprKind::EnumVariant(_)
+            | ExprKind::EnumTag(_) => {
                 panic!("got scalar expression in aggregate place");
             }
             ExprKind::Const(_) => unimplemented!(),
@@ -886,6 +890,17 @@ impl<'a> StmtBuilder<'a> {
             &ExprKind::Char(c) => {
                 let lltype = self.tybld.lltype(e.ty);
                 LLVMConstInt(lltype, c as u64, 0)
+            }
+            &ExprKind::EnumVariant(i) => {
+                assert_eq!(self.tybld.irtype(e.ty), &Type::I8);
+                let lltype = self.tybld.lltype(e.ty);
+                LLVMConstInt(lltype, i as u64, 0)
+            }
+            ExprKind::EnumTag(en) => {
+                let p = self.build_place(en);
+                let enty = self.tybld.lltype(en.ty);
+                let tag_ptr = LLVMBuildStructGEP2(self.bld, enty, p, 1, cstr!(""));
+                LLVMBuildLoad2(self.bld, LLVMInt8Type(), tag_ptr, cstr!(""))
             }
             _ => panic!("expected scalar, got {:?}", e),
         }
