@@ -771,6 +771,9 @@ impl<'a> StmtBuilder<'a> {
                     (Binop::Sub, Int) => LLVMBuildSub(self.bld, x, y, cstr!("")),
                     (Binop::Mul, Int) => LLVMBuildMul(self.bld, x, y, cstr!("")),
                     (Binop::Div, Int) => LLVMBuildSDiv(self.bld, x, y, cstr!("")),
+                    (Binop::And, Int) => LLVMBuildAnd(self.bld, x, y, cstr!("")),
+                    (Binop::Shl, Int) => LLVMBuildShl(self.bld, x, y, cstr!("")),
+                    (Binop::Shr, Int) => LLVMBuildLShr(self.bld, x, y, cstr!("")),
 
                     (Binop::Add, Float) => LLVMBuildFAdd(self.bld, x, y, cstr!("")),
                     (Binop::Sub, Float) => LLVMBuildFSub(self.bld, x, y, cstr!("")),

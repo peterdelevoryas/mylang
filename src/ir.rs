@@ -682,9 +682,14 @@ impl<'a> FuncBuilder<'a> {
                     syntax::GE => Binop::Cmp(Predicate::Ge),
                     syntax::EQ => Binop::Cmp(Predicate::Eq),
                     syntax::NE => Binop::Cmp(Predicate::Ne),
+                    syntax::AND => Binop::And,
+                    syntax::AMPERSAND => Binop::And,
+                    syntax::LSHIFT => Binop::Shl,
+                    syntax::RSHIFT => Binop::Shr,
                     _ => panic!(),
                 };
                 let x = self.build_expr(x, None);
+                let i8 = self.module.types.intern(Type::I8);
                 let i32 = self.module.types.intern(Type::I32);
                 let x_ty = self.module.types.get(x.ty);
                 let y_ty = match (x_ty.scalar_kind(), op) {
@@ -692,6 +697,7 @@ impl<'a> FuncBuilder<'a> {
                     (ScalarKind::Pointer, Binop::Sub) => x.ty,
                     (ScalarKind::Pointer, Binop::Cmp(_)) => x.ty,
                     (ScalarKind::Pointer, op) => panic!("pointer not allowed in {:?} expr", op),
+                    (ScalarKind::Int, Binop::Shl) => i8,
                     _ => x.ty,
                 };
                 let y = self.build_expr(y, Some(y_ty));
@@ -1106,10 +1112,13 @@ pub enum Unop {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Binop {
+    And,
     Add,
     Sub,
     Mul,
     Div,
+    Shl,
+    Shr,
     Cmp(Predicate),
 }
 

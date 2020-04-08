@@ -25,37 +25,42 @@ OPTIONS:
 
 struct Args {
     path: std::string::String,
+    print_ir: bool,
     print_llvm: bool,
 }
 
 fn parse_args() -> Args {
-    let mut path = None;
-    let mut print_llvm = false;
+    let mut args = Args {
+        path: std::string::String::new(),
+        print_ir: false,
+        print_llvm: false,
+    };
     for arg in env::args().skip(1) {
         if arg == "-h" || arg == "--help" {
             usage();
             error();
         }
         if arg == "--print-llvm" {
-            print_llvm = true;
+            args.print_llvm = true;
             continue;
         }
-        if let Some(path) = path {
-            println!("multiple file arguments: {:?}, {:?}", path, arg);
+        if arg == "--print-ir" {
+            args.print_ir = true;
+            continue;
+        }
+        if args.path != "" {
+            println!("multiple file arguments: {:?}, {:?}", args.path, arg);
             usage();
             error();
         }
-        path = Some(arg);
+        args.path = arg;
     }
-    let path = match path {
-        None => {
-            println!("missing file argument");
-            usage();
-            error();
-        }
-        Some(path) => path,
-    };
-    Args { path, print_llvm }
+    if args.path == "" {
+        println!("missing file argument");
+        usage();
+        error();
+    }
+    args
 }
 
 fn error() -> ! {

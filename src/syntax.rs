@@ -65,6 +65,9 @@ pub fn parse(text: &str) -> Module {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Token {
+    LSHIFT,
+    RSHIFT,
+    AND,
     ENUM,
     BREAK,
     CONTINUE,
@@ -245,6 +248,22 @@ pub struct Parser<'a> {
     pub token: Token,
 }
 
+fn parse_int(text: &[u8]) -> (Token, usize) {
+    let mut t = INTEGER;
+    let mut n = 1;
+    for c in &text[n..] {
+        match (t, c) {
+            (INTEGER, b'.') => {
+                t = FLOAT;
+            }
+            (_, c) if c.is_ascii_digit() => {}
+            _ => break,
+        }
+        n += 1;
+    }
+    (t, n)
+}
+
 impl<'a> Parser<'a> {
     pub fn next(&mut self) {
         loop {
@@ -268,11 +287,14 @@ impl<'a> Parser<'a> {
         };
 
         let (token, n) = match c {
+            '>' if d == '>' => (RSHIFT, 2),
+            '<' if d == '<' => (LSHIFT, 2),
             '-' if d == '>' => (ARROW, 2),
             '-' if d == '-' => (MINUSEQ, 2),
             '+' if d == '=' => (PLUSEQ, 2),
             '*' if d == '=' => (STAREQ, 2),
             '/' if d == '=' => (SLASHEQ, 2),
+            '-' if d.is_ascii_digit() => parse_int(text),
             '-' => (MINUS, 1),
             '&' => (AMPERSAND, 1),
             '+' => (PLUS, 1),
@@ -330,6 +352,7 @@ impl<'a> Parser<'a> {
                 }
                 // keywords
                 let token = match &text[..n] {
+                    b"and" => AND,
                     b"enum" => ENUM,
                     b"break" => BREAK,
                     b"continue" => CONTINUE,
@@ -351,21 +374,7 @@ impl<'a> Parser<'a> {
                 };
                 (token, n)
             }
-            _ if c.is_ascii_digit() => {
-                let mut t = INTEGER;
-                let mut n = 0;
-                for c in text {
-                    match (t, c) {
-                        (INTEGER, b'.') => {
-                            t = FLOAT;
-                        }
-                        (_, c) if c.is_ascii_digit() => {}
-                        _ => break,
-                    }
-                    n += 1;
-                }
-                (t, n)
-            }
+            _ if c.is_ascii_digit() => parse_int(text),
             _ => {
                 print_cursor(self.text, self.start, self.start + 1);
                 println!("unexpected character {:?}", c);
@@ -711,7 +720,9 @@ impl<'a> Parser<'a> {
     fn parse_binary(&mut self, mut lhs: Expr, min_precedence: i32) -> Expr {
         fn precedence(op: Token) -> i32 {
             match op {
+                AND => 0,
                 LT | GT | LE | GE | EQ | NE => 10,
+                AMPERSAND | LSHIFT | RSHIFT => 15,
                 PLUS | MINUS => 20,
                 STAR | SLASH => 30,
                 _ => -1,
@@ -723,7 +734,7 @@ impl<'a> Parser<'a> {
             let op = self.token;
             let i = precedence(op);
             self.next();
-            let mut rhs = self.parse_unary();
+            let mut rhs = self.parse_as();
             while precedence(self.token) > i {
                 let j = precedence(self.token);
                 rhs = self.parse_binary(rhs, j);
@@ -739,13 +750,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let lhs = self.parse_unary();
+        let lhs = self.parse_as();
         self.parse_binary(lhs, 0)
     }
 
     fn parse_as(&mut self) -> Expr {
         let start = self.start;
-        let mut x = self.parse_call();
+        let mut x = self.parse_unary();
         while self.token == AS {
             self.next();
             let ty = self.parse_type();
@@ -769,7 +780,7 @@ impl<'a> Parser<'a> {
                     span: (start as u16, self.end as u16),
                 }
             }
-            _ => self.parse_as(),
+            _ => self.parse_call(),
         }
     }
 
