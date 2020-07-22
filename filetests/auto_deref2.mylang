@@ -1,0 +1,35 @@
+// Structs and auto-deref
+
+fn printf(fmt: *i8, ...) -> i32;
+
+type vec3 struct {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+fn print(v: vec3) {
+    let x = v.x as f64;
+    let y = v.y as f64;
+    let z = v.z as f64;
+    printf("%f %f %f\n", x, y, z);
+}
+
+// Field accesses on pointers to structs are auto-deref'd.
+fn dot(x: *vec3, y: *vec3) -> f32 {
+    return x.x * y.x + x.y * y.y + x.z * y.z;
+}
+
+fn main(argc: i32, argv: **i8) -> i32 {
+    let a: vec3 = { x: 1.0, y: 2.0, z: 3.0, };
+    let b: vec3 = { x: 2.0, y: 3.0, z: 4.0, };
+    // check: 1.000000 2.000000 3.000000
+    // nextln: 2.000000 3.000000 4.000000
+    print(a);
+    print(b);
+    let ab = dot(&a, &b);
+    // nextln: dot a, b = 20.000000
+    printf("dot a, b = %f\n", ab as f64);
+
+    return 0;
+}

@@ -99,17 +99,18 @@ fn print(v: vec3) {
 }
 
 // Field accesses on pointers to structs are auto-deref'd.
-fn dot(a: *vec3, b: *vec3) {
-    a.x *= b.x;
-    a.y *= b.y;
-    a.z *= b.z;
+fn dot(x: *vec3, y: *vec3) -> f32 {
+    return x.x * y.x + x.y * y.y + x.z * y.z;
 }
 
 fn main(argc: i32, argv: **i8) -> i32 {
     let a: vec3 = { x: 1.0, y: 2.0, z: 3.0, };
     let b: vec3 = { x: 2.0, y: 3.0, z: 4.0, };
-    dot(&a, &b);
     print(a);
+    print(b);
+
+    let ab = dot(&a, &b);
+    printf("dot a, b = %f\n", ab as f64);
 
     return 0;
 }
