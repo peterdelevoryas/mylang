@@ -400,7 +400,9 @@ impl<'a> StmtBuilder<'a> {
                 self.build_block(body);
                 self.break_dest.pop();
                 self.continue_dest.pop();
-                LLVMBuildBr(self.bld, tail);
+                if LLVMGetBasicBlockTerminator(self.block).is_null() {
+                    LLVMBuildBr(self.bld, tail);
+                }
 
                 self.position_at_end(tail);
                 for stmt in post {
@@ -426,7 +428,7 @@ impl<'a> StmtBuilder<'a> {
                 self.build_block(body);
                 self.break_dest.pop();
                 self.continue_dest.pop();
-                if LLVMGetBasicBlockTerminator(then).is_null() {
+                if LLVMGetBasicBlockTerminator(self.block).is_null() {
                     LLVMBuildBr(self.bld, head);
                 }
 

@@ -60,22 +60,32 @@ fn main(argc: i32, argv: **i8) -> i32 {
 fn printf(fmt: *i8, ...) -> i32;
 fn strcmp(x: *i8, y: *i8) -> i32;
 
-fn main(argc: i32, argv: **i8) -> i32 {
+// Returns (filename, -)
+fn parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
     let file: *i8 = null;
+    let help = false;
     for let i = 1; i < argc; i += 1 {
-        if strcmp(argv[i], "-h") == 0 {
-            printf("usage: mylangc [options] file...\n");
+        let arg = argv[i];
+        if strcmp(arg, "-h") == 0 {
+            help = true;
             continue;
         }
-        file = argv[i];
-        break;
+        file = arg;
+    }
+    return (file, help);
+}
+
+fn main(argc: i32, argv: **i8) -> i32 {
+    let (file, help) = parse_args(argc, argv);
+    printf("help = %d, file = %s\n", help, file);
+    if help {
+        printf("usage: mylangc [-h] <file>\n");
+        return 1;
     }
     if file == null {
         printf("missing file argument\n");
         return 1;
     }
-    printf("file = %s\n", file);
-
     return 0;
 }
 ```
