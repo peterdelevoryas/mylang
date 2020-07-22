@@ -12,9 +12,9 @@ mod syntax;
 fn usage() {
     println!(
         "\
-OVERVIEW: cu LLVM compiler
+OVERVIEW: mylangc LLVM compiler
 
-USAGE: cu [options] file...
+USAGE: mylangc [options] file...
 
 OPTIONS:
     -h | --help             Display available options.
@@ -155,6 +155,7 @@ fn ld(path: &str, out: &str) {
     use std::process::Command;
     let mut gcc = Command::new("gcc");
     gcc.arg(path);
+    gcc.arg("-no-pie");
     gcc.arg("-o");
     gcc.arg(out);
 

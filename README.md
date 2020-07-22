@@ -64,7 +64,7 @@ fn main(argc: i32, argv: **i8) -> i32 {
     let file: *i8 = null;
     for let i = 1; i < argc; i += 1 {
         if strcmp(argv[i], "-h") == 0 {
-            printf("usage: cu [options] file...\n");
+            printf("usage: mylangc [options] file...\n");
             continue;
         }
         file = argv[i];

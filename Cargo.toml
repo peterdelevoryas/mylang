@@ -1,11 +1,15 @@
 [package]
-name = "cu"
+name = "mylang"
 version = "0.1.0"
-authors = ["Peter Delevoryas <me@peterdelevoryas.com>"]
+authors = ["Peter Delevoryas <me@peterd.net>"]
 edition = "2018"
 
+[[bin]]
+name = "mylangc"
+path = "src/main.rs"
+
 [dependencies.llvm-sys]
-git = "http://github.com/peterdelevoryas/llvm-sys.git"
+git = "https://github.com/peterdelevoryas/llvm-sys"
 
 [dev-dependencies]
 filecheck = "0.4.0"

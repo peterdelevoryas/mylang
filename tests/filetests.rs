@@ -13,7 +13,7 @@ fn filetests() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let manifest_dir = PathBuf::from(manifest_dir);
     let filetests_dir = manifest_dir.join("filetests");
-    let compiler_path = &manifest_dir.join("target/debug/cu");
+    let compiler_path = &manifest_dir.join("target/debug/mylangc");
 
     let test_paths = find_files(filetests_dir);
     let mut failed = vec![];
