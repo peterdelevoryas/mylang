@@ -115,3 +115,33 @@ fn main(argc: i32, argv: **i8) -> i32 {
     return 0;
 }
 ```
+
+```
+// Pattern matching with `if let`
+
+fn printf(fmt: *i8, ...);
+
+type expr enum {
+    int(i32),
+    string(*i8),
+}
+
+fn print(e: expr) {
+    if let int(i) = e {
+        printf("%d\n", i);
+    }
+    if let string(s) = e {
+        printf("%s\n", s);
+    }
+}
+
+fn main() -> i32 {
+    let e = expr.int(1);
+    print(e);
+
+    e = expr.string("hello world");
+    print(e);
+
+    return 0;
+}
+```
