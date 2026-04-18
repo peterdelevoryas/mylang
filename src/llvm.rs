@@ -2,9 +2,18 @@ use crate::error;
 use crate::ir::*;
 use llvm_sys::*;
 use std::ffi::CStr;
-use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::ptr;
+
+extern "C" {
+    fn LLVMBuildPtrDiff2(
+        arg1: LLVMBuilderRef,
+        elem_ty: LLVMTypeRef,
+        lhs: LLVMValueRef,
+        rhs: LLVMValueRef,
+        name: *const i8,
+    ) -> LLVMValueRef;
+}
 
 macro_rules! cstr {
     ($s:expr) => {{
@@ -19,8 +28,8 @@ pub unsafe fn build(module: &Module2) -> (LLVMTargetMachineRef, LLVMModuleRef) {
     LLVMInitializeX86AsmPrinter();
 
     let triple = LLVMGetDefaultTargetTriple();
-    let mut target = MaybeUninit::uninit().assume_init();
-    let mut err = MaybeUninit::uninit().assume_init();
+    let mut target = ptr::null_mut();
+    let mut err = ptr::null_mut();
     if LLVMGetTargetFromTriple(triple, &mut target, &mut err) != 0 {
         let err = CStr::from_ptr(err);
         println!("error getting llvm target: {:?}", err);
@@ -364,6 +373,13 @@ impl<'a> StmtBuilder<'a> {
         self.block = block;
     }
 
+    unsafe fn index_element_type(&self, ty: TypeId) -> LLVMTypeRef {
+        match self.tybld.irtype(ty) {
+            Type::Pointer(elem_ty) | Type::Array(elem_ty, _) => self.tybld.lltype(*elem_ty),
+            _ => panic!(),
+        }
+    }
+
     unsafe fn build_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Break => {
@@ -471,8 +487,7 @@ impl<'a> StmtBuilder<'a> {
             &ExprKind::Local(i) => self.locals[i],
             &ExprKind::Param(i) => LLVMGetParam(self.llfunc, i as u32),
             ExprKind::Index(p, i) => {
-                let ptr = self.tybld.lltype(p.ty);
-                let elem = LLVMGetElementType(ptr);
+                let elem = self.index_element_type(p.ty);
                 let ty = self.tybld.irtype(p.ty);
                 let p = match self.tybld.irtype(p.ty).kind() {
                     TypeKind::Aggregate => self.build_place(p),
@@ -697,7 +712,7 @@ impl<'a> StmtBuilder<'a> {
             | ExprKind::Integer(_)
             | ExprKind::Float(_)
             | ExprKind::Func(_)
-            | ExprKind::Type(_)
+            | ExprKind::Type
             | ExprKind::Unary(_, _)
             | ExprKind::Binary(_, _, _)
             | ExprKind::String(_)
@@ -762,7 +777,8 @@ impl<'a> StmtBuilder<'a> {
             ExprKind::Param(i) => LLVMGetParam(self.llfunc, *i as u32),
             ExprKind::Func(i) => self.llfuncs[*i],
             ExprKind::Binary(op, x, y) => {
-                let irty = self.tybld.irtype(x.ty);
+                let x_ty = x.ty;
+                let irty = self.tybld.irtype(x_ty);
                 let kind = irty.scalar_kind();
                 let x = self.build_scalar(x);
                 let y = self.build_scalar(y);
@@ -783,15 +799,17 @@ impl<'a> StmtBuilder<'a> {
                     (Binop::Div, Float) => LLVMBuildFDiv(self.bld, x, y, cstr!("")),
 
                     (Binop::Add, Pointer) => {
-                        let ptr = self.tybld.lltype(e.ty);
-                        let elem = LLVMGetElementType(ptr);
+                        let elem = self.index_element_type(e.ty);
                         let mut idx = [y];
                         let pidx = idx.as_mut_ptr();
                         let nidx = idx.len() as u32;
                         LLVMBuildGEP2(self.bld, elem, x, pidx, nidx, cstr!(""))
                     }
 
-                    (Binop::Sub, Pointer) => LLVMBuildPtrDiff(self.bld, x, y, cstr!("")),
+                    (Binop::Sub, Pointer) => {
+                        let elem = self.index_element_type(x_ty);
+                        LLVMBuildPtrDiff2(self.bld, elem, x, y, cstr!(""))
+                    }
 
                     (Binop::Cmp(pred), _) => {
                         let pred = match (pred, kind) {

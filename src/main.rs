@@ -4,6 +4,7 @@ use std::fmt;
 use std::fs;
 use std::ops::Deref;
 use std::process::exit;
+use std::sync::{Mutex, OnceLock};
 
 mod ir;
 mod llvm;
@@ -75,7 +76,8 @@ impl Deref for String {
     type Target = str;
     fn deref(&self) -> &str {
         let i = self.0 as usize;
-        unsafe { &INTERN[i] }
+        let intern = intern_table().lock().expect("intern table poisoned");
+        intern[i]
     }
 }
 
@@ -91,18 +93,21 @@ impl fmt::Display for String {
     }
 }
 
-static mut INTERN: Vec<std::string::String> = Vec::new();
+fn intern_table() -> &'static Mutex<Vec<&'static str>> {
+    static INTERN: OnceLock<Mutex<Vec<&'static str>>> = OnceLock::new();
+    INTERN.get_or_init(|| Mutex::new(Vec::new()))
+}
 
 pub fn intern(s: &str) -> String {
-    let intern = unsafe { &mut INTERN };
+    let mut intern = intern_table().lock().expect("intern table poisoned");
     for (i, interned) in intern.iter().enumerate() {
         let i = i as u16;
-        if s == interned {
+        if s == *interned {
             return String(i);
         }
     }
     let i = intern.len() as u16;
-    intern.push(s.into());
+    intern.push(Box::leak(s.to_owned().into_boxed_str()));
     String(i)
 }
 

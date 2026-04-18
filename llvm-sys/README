@@ -1,0 +1,30 @@
+Bindings for LLVM.
+
+To use in a Rust project:
+
+1. Install LLVM
+
+git clone https://git.llvm.org/git/llvm.git
+cd llvm
+mkdir build
+# requires CMake 3.4.3
+# also recommended: install ninja
+cmake -G Ninja ..
+cmake --build .
+cmake --build . --target install
+
+2. Include in Cargo.toml
+
+[dependencies.llvm-sys]
+git = "https://github.com/peterdelevoryas/llvm-sys.git"
+
+3. Look at auto generated documentation
+
+cargo doc --open -p llvm-sys
+
+4. Use the library facilities
+
+use llvm_sys::*;
+
+let m = LLVMModuleCreateWithName(b"m\0".as_ptr() as *const _);
+...

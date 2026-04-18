@@ -1,3 +1,6 @@
+[workspace]
+members = ["llvm-sys"]
+
 [package]
 name = "mylang"
 version = "0.1.0"
@@ -9,7 +12,7 @@ name = "mylangc"
 path = "src/main.rs"
 
 [dependencies.llvm-sys]
-git = "https://github.com/peterdelevoryas/llvm-sys"
+path = "llvm-sys"
 
 [dev-dependencies]
 filecheck = "0.4.0"

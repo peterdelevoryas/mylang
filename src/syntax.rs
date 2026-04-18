@@ -12,7 +12,7 @@ pub struct Module<'a> {
     pub func_bodys: Vec<FuncBody>,
 }
 
-pub fn parse(text: &str) -> Module {
+pub fn parse(text: &str) -> Module<'_> {
     let mut p = Parser {
         text: text,
         start: 0,
@@ -149,12 +149,6 @@ pub enum TypeDeclKind {
 pub struct EnumVariant {
     pub name: String,
     pub args: Vec<Type>,
-}
-
-#[derive(Debug, Clone)]
-pub struct StructType {
-    pub name: String,
-    pub fields: Vec<(String, Type)>,
 }
 
 #[derive(Debug, Clone)]

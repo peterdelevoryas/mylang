@@ -82,7 +82,6 @@ pub struct Module2 {
 
 #[derive(Debug)]
 pub struct Const {
-    pub name: String,
     pub expr: Expr,
 }
 
@@ -169,8 +168,8 @@ impl<'a> FuncBuilder<'a> {
     fn build_match_expr(&mut self, pat: &syntax::Pattern, rhs: Expr) -> Option<Expr> {
         let cond = match pat {
             syntax::Pattern::Name(_) => return None,
-            syntax::Pattern::Tuple(elems) => unimplemented!(),
-            &syntax::Pattern::EnumVariant(name, ref elems) => {
+            syntax::Pattern::Tuple(_) => unimplemented!(),
+            &syntax::Pattern::EnumVariant(name, ref _elems) => {
                 let variant_index = match self.module.types.get(rhs.ty) {
                     Type::Enum(ety) => ety.variant(name).unwrap().0,
                     _ => panic!(),
@@ -747,7 +746,7 @@ impl<'a> FuncBuilder<'a> {
                         let ty = self.module.func_decls[self.body.id].ty.params[i];
                         (ExprKind::Param(i), ty)
                     }
-                    Def::Type(id) => (ExprKind::Type(id), id),
+                    Def::Type(id) => (ExprKind::Type, id),
                     Def::Const(i) => {
                         let ty = self.module.consts[i].expr.ty;
                         (ExprKind::Const(i), ty)
@@ -780,10 +779,7 @@ impl ModuleBuilder {
             None => None,
         };
         let expr = self.check_const_expr(&const_decl.value, ty);
-        let c = Const {
-            name: const_decl.name,
-            expr: expr,
-        };
+        let c = Const { expr: expr };
         let id = self.consts.len();
         self.consts.push(c);
         id
@@ -1132,7 +1128,7 @@ pub enum ExprKind {
     Param(ParamId),
     Func(FuncId),
     Local(LocalId),
-    Type(TypeId),
+    Type,
     Unary(Unop, Box<Expr>),
     Binary(Binop, Box<Expr>, Box<Expr>),
     String(String),
@@ -1152,19 +1148,4 @@ pub enum ExprKind {
     EnumField(Box<Expr>, u32, u32),
     // Read enum tag from expr
     EnumTag(Box<Expr>),
-}
-
-pub fn print(module: &Module2) {
-    for (i, ty) in module.types.iter().enumerate() {
-        println!("type {:?} = {:?}", i, ty);
-    }
-    for func_decl in &module.func_decls {
-        println!("{:?}", func_decl);
-    }
-    for func_body in &module.func_bodys {
-        println!("{:?}", func_body.locals);
-        for stmt in &func_body.body.stmts {
-            println!("{:?}", stmt);
-        }
-    }
 }
