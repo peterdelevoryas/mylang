@@ -41,11 +41,10 @@ function main() -> i32 {
 ```
 // Hello world
 
-// You can (and must) declare externally defined functions to link with.
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 function main(argc: i32, argv: **i8) -> i32 {
-    printf("hello world\n");
+    libc.printf("hello world\n");
     return 0;
 }
 ```
@@ -53,14 +52,15 @@ function main(argc: i32, argv: **i8) -> i32 {
 ```
 // Local variable declaration
 
-function printf(fmt: *i8, ...) -> i32;
+import libc;
+
 function main(argc: i32, argv: **i8) -> i32 {
     // Basic local variable declaration.
     let x: i32 = 1;
 
     // Type annotation is optional, and shadowing is allowed.
     let x = 2;
-    printf("%d\n", x); // 2
+    libc.printf("%d\n", x); // 2
 
     return 0;
 }
@@ -69,8 +69,7 @@ function main(argc: i32, argv: **i8) -> i32 {
 ```
 // Parse compiler args
 
-function printf(fmt: *i8, ...) -> i32;
-function strcmp(x: *i8, y: *i8) -> i32;
+import libc;
 
 // Returns (filename, -)
 function parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
@@ -78,7 +77,7 @@ function parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
     let help = false;
     for let i = 1; i < argc; i += 1 {
         let arg = argv[i];
-        if strcmp(arg, "-h") == 0 {
+        if libc.strcmp(arg, "-h") == 0 {
             help = true;
             continue;
         }
@@ -89,13 +88,13 @@ function parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
 
 function main(argc: i32, argv: **i8) -> i32 {
     let (file, help) = parse_args(argc, argv);
-    printf("help = %d, file = %s\n", help, file);
+    libc.printf("help = %d, file = %s\n", help, file);
     if help {
-        printf("usage: ono [-h] <file>\n");
+        libc.printf("usage: ono [-h] <file>\n");
         return 1;
     }
     if file == null {
-        printf("missing file argument\n");
+        libc.printf("missing file argument\n");
         return 1;
     }
     return 0;
@@ -105,7 +104,7 @@ function main(argc: i32, argv: **i8) -> i32 {
 ```
 // 4x4 Matrix multiplication
 
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 type Mat4 = [4][4]f32;
 
@@ -139,9 +138,9 @@ function matmul(a: Mat4, b: Mat4) -> Mat4 {
 function print(a: Mat4) {
     for let i = 0; i < 4; i += 1 {
         for let j = 0; j < 4; j += 1 {
-            printf("%10.4f  ", a[i][j] as f64);
+            libc.printf("%10.4f  ", a[i][j] as f64);
         }
-        printf("\n");
+        libc.printf("\n");
     }
 }
 
@@ -160,7 +159,7 @@ function main() -> i32 {
 ```
 // Structs and auto-deref
 
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 type Vec3 = struct {
     x: f32,
@@ -172,7 +171,7 @@ function print(v: Vec3) {
     let x = v.x as f64;
     let y = v.y as f64;
     let z = v.z as f64;
-    printf("%f %f %f\n", x, y, z);
+    libc.printf("%f %f %f\n", x, y, z);
 }
 
 // Field accesses on pointers to structs are auto-deref'd.
@@ -187,7 +186,7 @@ function main(argc: i32, argv: **i8) -> i32 {
     print(b);
 
     let ab = dot(&a, &b);
-    printf("dot a, b = %f\n", ab as f64);
+    libc.printf("dot a, b = %f\n", ab as f64);
 
     return 0;
 }
@@ -196,7 +195,7 @@ function main(argc: i32, argv: **i8) -> i32 {
 ```
 // Pattern matching with `if let`
 
-function printf(fmt: *i8, ...);
+import libc;
 
 type Expr = enum {
     Int(i32),
@@ -205,10 +204,10 @@ type Expr = enum {
 
 function print(e: Expr) {
     if let Int(i) = e {
-        printf("%d\n", i);
+        libc.printf("%d\n", i);
     }
     if let String(s) = e {
-        printf("%s\n", s);
+        libc.printf("%s\n", s);
     }
 }
 
