@@ -13,9 +13,9 @@ mod syntax;
 fn usage() {
     println!(
         "\
-OVERVIEW: mylangc LLVM compiler
+OVERVIEW: ono LLVM compiler
 
-USAGE: mylangc [options] file...
+USAGE: ono [options] file...
 
 OPTIONS:
     -h | --help             Display available options.

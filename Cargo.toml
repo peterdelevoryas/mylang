@@ -2,13 +2,13 @@
 members = ["llvm-sys"]
 
 [package]
-name = "mylang"
+name = "ono"
 version = "0.1.0"
 authors = ["Peter Delevoryas <me@peterd.net>"]
 edition = "2018"
 
 [[bin]]
-name = "mylangc"
+name = "ono"
 path = "src/main.rs"
 
 [dependencies.llvm-sys]

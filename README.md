@@ -79,7 +79,7 @@ function main(argc: i32, argv: **i8) -> i32 {
     let (file, help) = ParseArgs(argc, argv);
     printf("help = %d, file = %s\n", help, file);
     if help {
-        printf("usage: mylangc [-h] <file>\n");
+        printf("usage: ono [-h] <file>\n");
         return 1;
     }
     if file == null {
