@@ -1,0 +1,9 @@
+[[language]]
+name = "mylang"
+scope = "source.mylang"
+injection-regex = "mylang"
+file-types = ["mylang"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+indent = { tab-width = 4, unit = "    " }
+grammar = "typescript"
