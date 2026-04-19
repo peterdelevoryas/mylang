@@ -1,14 +1,14 @@
-fn printf(fmt: *i8, ...) -> i32;
+function printf(fmt: *i8, ...) -> i32;
 
-fn Add(x: i32, y: i32) -> i32 {
+function Add(x: i32, y: i32) -> i32 {
     let z = x + y;
     printf("%d + %d = %d\n", x, y, z);
     return z;
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     // check: 1 + 2 = 3
-    let f: *fn(i32, i32) -> i32 = &Add;
+    let f: *function(i32, i32) -> i32 = &Add;
     f(1, 2);
 
     return 0;

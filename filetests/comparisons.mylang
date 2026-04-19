@@ -1,10 +1,10 @@
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
-fn Print(b: bool) {
+function Print(b: bool) {
     printf("%d\n", b);
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     // check: 1
     Print(1 == 1);
     // nextln: 0

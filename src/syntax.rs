@@ -34,7 +34,7 @@ pub fn parse(text: &str) -> Module<'_> {
                 let type_decl = p.parse_type_decl();
                 type_decls.push(type_decl);
             }
-            FN => {
+            FUNCTION => {
                 let decl = p.parse_func_decl();
                 let id = func_decls.len();
                 func_decls.push(decl);
@@ -100,7 +100,7 @@ pub enum Token {
     STAR,
     ARROW,
     ASSIGN,
-    FN,
+    FUNCTION,
     AS,
     LET,
     RETURN,
@@ -356,7 +356,7 @@ impl<'a> Parser<'a> {
                     b"for" => FOR,
                     b"while" => WHILE,
                     b"if" => IF,
-                    b"fn" => FN,
+                    b"function" => FUNCTION,
                     b"as" => AS,
                     b"let" => LET,
                     b"return" => RETURN,
@@ -493,7 +493,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_func_decl(&mut self) -> FuncDecl {
-        self.parse(FN);
+        self.parse(FUNCTION);
 
         let name = self.token_string();
         self.parse(NAME);
@@ -979,7 +979,7 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         match self.token {
-            FN => {
+            FUNCTION => {
                 self.next();
                 self.parse(LPARENS);
                 let mut var_args = false;

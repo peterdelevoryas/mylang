@@ -1,11 +1,11 @@
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
 type Expr enum {
     Int(i32),
     String(*i8),
 }
 
-fn Print(e: Expr) {
+function Print(e: Expr) {
     if let Int(i) = e {
         printf("%d\n", i);
     }
@@ -14,7 +14,7 @@ fn Print(e: Expr) {
     }
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     // check: 1
     let e = Expr.Int(1);
     Print(e);

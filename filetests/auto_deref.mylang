@@ -1,4 +1,4 @@
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
 type Person struct {
     name: *i8,
@@ -8,14 +8,14 @@ type Person struct {
 }
 
 // field accesses on pointers to structs are auto-deref'd
-fn PrintPerson(p: *Person) {
+function PrintPerson(p: *Person) {
     printf("name: %s\n", p.name);
     printf("height: %f\n", p.height as f64);
     printf("weight: %f\n", p.weight as f64);
     printf("age: %d\n", p.age);
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     let bob: Person = {
         name: "bob",
         height: 5.128,

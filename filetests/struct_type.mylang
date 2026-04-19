@@ -1,24 +1,24 @@
-fn printf(fmt: *i8, ...);
-fn strlen(s: *i8) -> i64;
-fn strcmp(s1: *i8, s2: *i8) -> i32;
+function printf(fmt: *i8, ...);
+function strlen(s: *i8) -> i64;
+function strcmp(s1: *i8, s2: *i8) -> i32;
 
 type String struct {
     ptr: *i8,
 }
 
-fn MakeString(ptr: *i8) -> String {
+function MakeString(ptr: *i8) -> String {
     return { ptr: ptr };
 }
 
-fn Cmp(x: String, y: String) -> i32 {
+function Cmp(x: String, y: String) -> i32 {
     return strcmp(x.ptr, y.ptr);
 }
 
-fn Len(s: String) -> i64 {
+function Len(s: String) -> i64 {
     return strlen(s.ptr);
 }
 
-fn main() -> i32 {
+function main() -> i32 {
 
     // check: abcdefg
     // nextln: 7

@@ -1,6 +1,6 @@
-fn printf(fmt: *i8, ...);
-fn malloc(size: i64) -> *i8;
-fn free(ptr: *i8);
+function printf(fmt: *i8, ...);
+function malloc(size: i64) -> *i8;
+function free(ptr: *i8);
 
 type Data struct {
     x: i32,
@@ -8,11 +8,11 @@ type Data struct {
     z: i32,
 }
 
-fn Print(x: *Data) {
+function Print(x: *Data) {
     printf("%d %d %d\n", x.x, x.y, x.z);
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     // check: 0 0 0
     // nextln: 1 2 3
     // nextln: 2 4 6

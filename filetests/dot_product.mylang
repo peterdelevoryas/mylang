@@ -1,4 +1,4 @@
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
 type Vec3 struct {
     x: f32,
@@ -6,11 +6,11 @@ type Vec3 struct {
     z: f32,
 }
 
-fn Dot(x: Vec3, y: Vec3) -> f32 {
+function Dot(x: Vec3, y: Vec3) -> f32 {
     return x.x * y.x + x.y * y.y + x.z * y.z;
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     let x: Vec3 = { x: 1.0, y: 2.0, z: 3.0, };
     let y: Vec3 = { x: 7.0, y: 8.0, z: 9.0, };
     let p = Dot(x, y);

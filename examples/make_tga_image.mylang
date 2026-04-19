@@ -1,12 +1,12 @@
-fn printf(fmt: *i8, ...);
-fn malloc(size: i64) -> *i8;
-fn memset(b: *i8, c: i32, len: i64) -> *i8;
-fn memcpy(dst: *i8, src: *i8, n: i64) -> *i8;
-fn free(ptr: *i8);
+function printf(fmt: *i8, ...);
+function malloc(size: i64) -> *i8;
+function memset(b: *i8, c: i32, len: i64) -> *i8;
+function memcpy(dst: *i8, src: *i8, n: i64) -> *i8;
+function free(ptr: *i8);
 type FILE = ();
-fn fopen(path: *i8, mode: *i8) -> *FILE;
-fn fwrite(ptr: *i8, size: i64, nitems: i64, stream: *FILE) -> i64;
-fn fclose(stream: *FILE) -> i32;
+function fopen(path: *i8, mode: *i8) -> *FILE;
+function fwrite(ptr: *i8, size: i64, nitems: i64, stream: *FILE) -> i64;
+function fclose(stream: *FILE) -> i32;
 
 type Point struct {
     x: i32,
@@ -25,7 +25,7 @@ type Image struct {
     height: i32,
 }
 
-fn NewImage(width: i32, height: i32) -> Image {
+function NewImage(width: i32, height: i32) -> Image {
     let size = width as i64 * height as i64 * sizeof(Pixel);
     let pixels = malloc(size);
     memset(pixels, 0, size);
@@ -37,7 +37,7 @@ fn NewImage(width: i32, height: i32) -> Image {
     };
 }
 
-fn SetPixel(image: Image, p: Point, color: Pixel) {
+function SetPixel(image: Image, p: Point, color: Pixel) {
     if p.x >= image.width {
         return;
     }
@@ -47,26 +47,26 @@ fn SetPixel(image: Image, p: Point, color: Pixel) {
     image.pixels[image.width * p.y + p.x] = color;
 }
 
-fn Abs(x: i32) -> i32 {
+function Abs(x: i32) -> i32 {
     if x < 0 {
         return -1 * x;
     }
     return x;
 }
 
-fn SwapI32(x: *i32, y: *i32) {
+function SwapI32(x: *i32, y: *i32) {
     let tmp = *x;
     *x = *y;
     *y = tmp;
 }
 
-fn SwapPoints(x: *Point, y: *Point) {
+function SwapPoints(x: *Point, y: *Point) {
     let tmp = *x;
     *x = *y;
     *y = tmp;
 }
 
-fn DrawLine(image: Image, a: Point, b: Point, color: Pixel) {
+function DrawLine(image: Image, a: Point, b: Point, color: Pixel) {
     let steep = false;
     if Abs(a.x - b.x) < Abs(a.y - b.y) {
         SwapI32(&a.x, &a.y);
@@ -88,7 +88,7 @@ fn DrawLine(image: Image, a: Point, b: Point, color: Pixel) {
     }
 }
 
-fn DrawGrid(image: Image) {
+function DrawGrid(image: Image) {
     let spacing = 50;
     for let x = spacing; x < image.width; x += spacing {
         for let y = spacing; y < image.height; y += spacing {
@@ -98,7 +98,7 @@ fn DrawGrid(image: Image) {
     }
 }
 
-fn FlipImage(image: Image) {
+function FlipImage(image: Image) {
     let row_size = image.width as i64 * sizeof(Pixel);
     let tmp = malloc(row_size);
 
@@ -113,13 +113,13 @@ fn FlipImage(image: Image) {
     free(tmp);
 }
 
-fn SplitI16(x: i16) -> (i8, i8)  {
+function SplitI16(x: i16) -> (i8, i8)  {
     let lower = ((x >> 0) & 255) as i8;
     let upper = ((x >> 8) & 255) as i8;
     return (lower, upper);
 }
 
-fn WriteTgaFile(image: Image, path: *i8) {
+function WriteTgaFile(image: Image, path: *i8) {
     let pixels_size = image.width as i64 * image.height as i64 * sizeof(Pixel);
     let header_size: i64 = 18;
     let output_size = header_size + pixels_size;
@@ -144,7 +144,7 @@ fn WriteTgaFile(image: Image, path: *i8) {
     free(output);
 }
 
-fn main() {
+function main() {
     let image = NewImage(200, 200);
     DrawGrid(image);
     FlipImage(image);

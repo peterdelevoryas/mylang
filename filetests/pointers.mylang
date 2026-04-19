@@ -1,4 +1,4 @@
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
 type Data struct {
     x: i8,
@@ -6,7 +6,7 @@ type Data struct {
     z: i32,
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     let x = 1;
     let p = &x;
     // check: 1

@@ -30,9 +30,9 @@ some are reproduced with added comments.
 // Hello world
 
 // You can (and must) declare externally defined functions to link with.
-fn printf(fmt: *i8, ...) -> i32;
+function printf(fmt: *i8, ...) -> i32;
 
-fn main(argc: i32, argv: **i8) -> i32 {
+function main(argc: i32, argv: **i8) -> i32 {
     printf("hello world\n");
     return 0;
 }
@@ -41,8 +41,8 @@ fn main(argc: i32, argv: **i8) -> i32 {
 ```
 // Local variable declaration
 
-fn printf(fmt: *i8, ...) -> i32;
-fn main(argc: i32, argv: **i8) -> i32 {
+function printf(fmt: *i8, ...) -> i32;
+function main(argc: i32, argv: **i8) -> i32 {
     // Basic local variable declaration.
     let x: i32 = 1;
 
@@ -57,11 +57,11 @@ fn main(argc: i32, argv: **i8) -> i32 {
 ```
 // Parse compiler args
 
-fn printf(fmt: *i8, ...) -> i32;
-fn strcmp(x: *i8, y: *i8) -> i32;
+function printf(fmt: *i8, ...) -> i32;
+function strcmp(x: *i8, y: *i8) -> i32;
 
 // Returns (filename, -)
-fn ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
+function ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
     let file: *i8 = null;
     let help = false;
     for let i = 1; i < argc; i += 1 {
@@ -75,7 +75,7 @@ fn ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
     return (file, help);
 }
 
-fn main(argc: i32, argv: **i8) -> i32 {
+function main(argc: i32, argv: **i8) -> i32 {
     let (file, help) = ParseArgs(argc, argv);
     printf("help = %d, file = %s\n", help, file);
     if help {
@@ -93,11 +93,11 @@ fn main(argc: i32, argv: **i8) -> i32 {
 ```
 // 4x4 Matrix multiplication
 
-fn printf(fmt: *i8, ...) -> i32;
+function printf(fmt: *i8, ...) -> i32;
 
 type Mat4 = [4][4]f32;
 
-fn MatMul(A: Mat4, B: Mat4) -> Mat4 {
+function MatMul(A: Mat4, B: Mat4) -> Mat4 {
     let xx = A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[2][0] + A[0][3] * B[3][0];
     let xy = A[0][0] * B[0][1] + A[0][1] * B[1][1] + A[0][2] * B[2][1] + A[0][3] * B[3][1];
     let xz = A[0][0] * B[0][2] + A[0][1] * B[1][2] + A[0][2] * B[2][2] + A[0][3] * B[3][2];
@@ -124,7 +124,7 @@ fn MatMul(A: Mat4, B: Mat4) -> Mat4 {
             [wx, wy, wz, ww]];
 }
 
-fn Print(A: Mat4) {
+function Print(A: Mat4) {
     for let i = 0; i < 4; i += 1 {
         for let j = 0; j < 4; j += 1 {
             printf("%10.4f  ", A[i][j] as f64);
@@ -133,7 +133,7 @@ fn Print(A: Mat4) {
     }
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     let A = [[ 1.0,  9.0,  3.0,  4.0],
              [ 2.0, -4.0,  5.0,  0.5],
              [-3.0,  1.0,  6.0, -3.0],
@@ -148,7 +148,7 @@ fn main() -> i32 {
 ```
 // Structs and auto-deref
 
-fn printf(fmt: *i8, ...) -> i32;
+function printf(fmt: *i8, ...) -> i32;
 
 type Vec3 struct {
     x: f32,
@@ -156,7 +156,7 @@ type Vec3 struct {
     z: f32,
 }
 
-fn Print(v: Vec3) {
+function Print(v: Vec3) {
     let x = v.x as f64;
     let y = v.y as f64;
     let z = v.z as f64;
@@ -164,11 +164,11 @@ fn Print(v: Vec3) {
 }
 
 // Field accesses on pointers to structs are auto-deref'd.
-fn Dot(x: *Vec3, y: *Vec3) -> f32 {
+function Dot(x: *Vec3, y: *Vec3) -> f32 {
     return x.x * y.x + x.y * y.y + x.z * y.z;
 }
 
-fn main(argc: i32, argv: **i8) -> i32 {
+function main(argc: i32, argv: **i8) -> i32 {
     let a: Vec3 = { x: 1.0, y: 2.0, z: 3.0, };
     let b: Vec3 = { x: 2.0, y: 3.0, z: 4.0, };
     Print(a);
@@ -184,14 +184,14 @@ fn main(argc: i32, argv: **i8) -> i32 {
 ```
 // Pattern matching with `if let`
 
-fn printf(fmt: *i8, ...);
+function printf(fmt: *i8, ...);
 
 type Expr enum {
     Int(i32),
     String(*i8),
 }
 
-fn Print(e: Expr) {
+function Print(e: Expr) {
     if let Int(i) = e {
         printf("%d\n", i);
     }
@@ -200,7 +200,7 @@ fn Print(e: Expr) {
     }
 }
 
-fn main() -> i32 {
+function main() -> i32 {
     let e = Expr.Int(1);
     Print(e);
 
