@@ -1,16 +1,16 @@
-type FILE = struct {};
-type int = i32;
-type long = i64;
-type char = i8;
+type File = struct {};
+type Int = i32;
+type Long = i64;
+type Char = i8;
 
-function printf(fmt: *char, ...) -> i32;
-function fread(ptr: *char, size: long, nitems: long, stream: *FILE) -> long;
-function fopen(path: *char, mode: *char) -> *FILE;
-function fclose(stream: *FILE) -> int;
-function ftell(stream: *FILE) -> long;
-function fseek(stream: *FILE, offset: long, whence: int) -> int;
+function printf(fmt: *Char, ...) -> i32;
+function fread(ptr: *Char, size: Long, nitems: Long, stream: *File) -> Long;
+function fopen(path: *Char, mode: *Char) -> *File;
+function fclose(stream: *File) -> Int;
+function ftell(stream: *File) -> Long;
+function fseek(stream: *File, offset: Long, whence: Int) -> Int;
 
-function main(argc: int, argv: **char) -> int {
+function main(argc: Int, argv: **Char) -> Int {
     if argc < 2 {
         printf("not enough arguments\n");
     }

@@ -8,7 +8,7 @@ type Person = struct {
 };
 
 // field accesses on pointers to structs are auto-deref'd
-function PrintPerson(p: *Person) {
+function print_person(p: *Person) {
     printf("name: %s\n", p.name);
     printf("height: %f\n", p.height as f64);
     printf("weight: %f\n", p.weight as f64);
@@ -26,7 +26,7 @@ function main() -> i32 {
     // nextln: 5.128000
     // nextln: 175.889999
     // nextln: 32
-    PrintPerson(&bob);
+    print_person(&bob);
 
     return 0;
 }

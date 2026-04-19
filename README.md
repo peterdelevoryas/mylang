@@ -61,7 +61,7 @@ function printf(fmt: *i8, ...) -> i32;
 function strcmp(x: *i8, y: *i8) -> i32;
 
 // Returns (filename, -)
-function ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
+function parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
     let file: *i8 = null;
     let help = false;
     for let i = 1; i < argc; i += 1 {
@@ -76,7 +76,7 @@ function ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
 }
 
 function main(argc: i32, argv: **i8) -> i32 {
-    let (file, help) = ParseArgs(argc, argv);
+    let (file, help) = parse_args(argc, argv);
     printf("help = %d, file = %s\n", help, file);
     if help {
         printf("usage: ono [-h] <file>\n");
@@ -97,26 +97,26 @@ function printf(fmt: *i8, ...) -> i32;
 
 type Mat4 = [4][4]f32;
 
-function MatMul(A: Mat4, B: Mat4) -> Mat4 {
-    let xx = A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[2][0] + A[0][3] * B[3][0];
-    let xy = A[0][0] * B[0][1] + A[0][1] * B[1][1] + A[0][2] * B[2][1] + A[0][3] * B[3][1];
-    let xz = A[0][0] * B[0][2] + A[0][1] * B[1][2] + A[0][2] * B[2][2] + A[0][3] * B[3][2];
-    let xw = A[0][0] * B[0][3] + A[0][1] * B[1][3] + A[0][2] * B[2][3] + A[0][3] * B[3][3];
+function matmul(a: Mat4, b: Mat4) -> Mat4 {
+    let xx = a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0] + a[0][3] * b[3][0];
+    let xy = a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1] + a[0][3] * b[3][1];
+    let xz = a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2] + a[0][3] * b[3][2];
+    let xw = a[0][0] * b[0][3] + a[0][1] * b[1][3] + a[0][2] * b[2][3] + a[0][3] * b[3][3];
 
-    let yx = A[1][0] * B[0][0] + A[1][1] * B[1][0] + A[1][2] * B[2][0] + A[1][3] * B[3][0];
-    let yy = A[1][0] * B[0][1] + A[1][1] * B[1][1] + A[1][2] * B[2][1] + A[1][3] * B[3][1];
-    let yz = A[1][0] * B[0][2] + A[1][1] * B[1][2] + A[1][2] * B[2][2] + A[1][3] * B[3][2];
-    let yw = A[1][0] * B[0][3] + A[1][1] * B[1][3] + A[1][2] * B[2][3] + A[1][3] * B[3][3];
+    let yx = a[1][0] * b[0][0] + a[1][1] * b[1][0] + a[1][2] * b[2][0] + a[1][3] * b[3][0];
+    let yy = a[1][0] * b[0][1] + a[1][1] * b[1][1] + a[1][2] * b[2][1] + a[1][3] * b[3][1];
+    let yz = a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] * b[2][2] + a[1][3] * b[3][2];
+    let yw = a[1][0] * b[0][3] + a[1][1] * b[1][3] + a[1][2] * b[2][3] + a[1][3] * b[3][3];
 
-    let zx = A[2][0] * B[0][0] + A[2][1] * B[1][0] + A[2][2] * B[2][0] + A[2][3] * B[3][0];
-    let zy = A[2][0] * B[0][1] + A[2][1] * B[1][1] + A[2][2] * B[2][1] + A[2][3] * B[3][1];
-    let zz = A[2][0] * B[0][2] + A[2][1] * B[1][2] + A[2][2] * B[2][2] + A[2][3] * B[3][2];
-    let zw = A[2][0] * B[0][3] + A[2][1] * B[1][3] + A[2][2] * B[2][3] + A[2][3] * B[3][3];
+    let zx = a[2][0] * b[0][0] + a[2][1] * b[1][0] + a[2][2] * b[2][0] + a[2][3] * b[3][0];
+    let zy = a[2][0] * b[0][1] + a[2][1] * b[1][1] + a[2][2] * b[2][1] + a[2][3] * b[3][1];
+    let zz = a[2][0] * b[0][2] + a[2][1] * b[1][2] + a[2][2] * b[2][2] + a[2][3] * b[3][2];
+    let zw = a[2][0] * b[0][3] + a[2][1] * b[1][3] + a[2][2] * b[2][3] + a[2][3] * b[3][3];
 
-    let wx = A[3][0] * B[0][0] + A[3][1] * B[1][0] + A[3][2] * B[2][0] + A[3][3] * B[3][0];
-    let wy = A[3][0] * B[0][1] + A[3][1] * B[1][1] + A[3][2] * B[2][1] + A[3][3] * B[3][1];
-    let wz = A[3][0] * B[0][2] + A[3][1] * B[1][2] + A[3][2] * B[2][2] + A[3][3] * B[3][2];
-    let ww = A[3][0] * B[0][3] + A[3][1] * B[1][3] + A[3][2] * B[2][3] + A[3][3] * B[3][3];
+    let wx = a[3][0] * b[0][0] + a[3][1] * b[1][0] + a[3][2] * b[2][0] + a[3][3] * b[3][0];
+    let wy = a[3][0] * b[0][1] + a[3][1] * b[1][1] + a[3][2] * b[2][1] + a[3][3] * b[3][1];
+    let wz = a[3][0] * b[0][2] + a[3][1] * b[1][2] + a[3][2] * b[2][2] + a[3][3] * b[3][2];
+    let ww = a[3][0] * b[0][3] + a[3][1] * b[1][3] + a[3][2] * b[2][3] + a[3][3] * b[3][3];
 
     return [[xx, xy, xz, xw],
             [yx, yy, yz, yw],
@@ -124,23 +124,23 @@ function MatMul(A: Mat4, B: Mat4) -> Mat4 {
             [wx, wy, wz, ww]];
 }
 
-function Print(A: Mat4) {
+function print(a: Mat4) {
     for let i = 0; i < 4; i += 1 {
         for let j = 0; j < 4; j += 1 {
-            printf("%10.4f  ", A[i][j] as f64);
+            printf("%10.4f  ", a[i][j] as f64);
         }
         printf("\n");
     }
 }
 
 function main() -> i32 {
-    let A = [[ 1.0,  9.0,  3.0,  4.0],
+    let a = [[ 1.0,  9.0,  3.0,  4.0],
              [ 2.0, -4.0,  5.0,  0.5],
              [-3.0,  1.0,  6.0, -3.0],
              [ 6.0, 10.0, 11.0,  1.0]];
-    let B = MatMul(A, A);
-    Print(A);
-    Print(B);
+    let b = matmul(a, a);
+    print(a);
+    print(b);
     return 0;
 }
 ```
@@ -156,7 +156,7 @@ type Vec3 = struct {
     z: f32,
 };
 
-function Print(v: Vec3) {
+function print(v: Vec3) {
     let x = v.x as f64;
     let y = v.y as f64;
     let z = v.z as f64;
@@ -164,17 +164,17 @@ function Print(v: Vec3) {
 }
 
 // Field accesses on pointers to structs are auto-deref'd.
-function Dot(x: *Vec3, y: *Vec3) -> f32 {
+function dot(x: *Vec3, y: *Vec3) -> f32 {
     return x.x * y.x + x.y * y.y + x.z * y.z;
 }
 
 function main(argc: i32, argv: **i8) -> i32 {
     let a: Vec3 = { x: 1.0, y: 2.0, z: 3.0, };
     let b: Vec3 = { x: 2.0, y: 3.0, z: 4.0, };
-    Print(a);
-    Print(b);
+    print(a);
+    print(b);
 
-    let ab = Dot(&a, &b);
+    let ab = dot(&a, &b);
     printf("dot a, b = %f\n", ab as f64);
 
     return 0;
@@ -191,7 +191,7 @@ type Expr = enum {
     String(*i8),
 };
 
-function Print(e: Expr) {
+function print(e: Expr) {
     if let Int(i) = e {
         printf("%d\n", i);
     }
@@ -202,10 +202,10 @@ function Print(e: Expr) {
 
 function main() -> i32 {
     let e = Expr.Int(1);
-    Print(e);
+    print(e);
 
     e = Expr.String("hello world");
-    Print(e);
+    print(e);
 
     return 0;
 }

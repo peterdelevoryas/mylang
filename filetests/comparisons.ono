@@ -1,77 +1,77 @@
 function printf(fmt: *i8, ...);
 
-function Print(b: bool) {
+function print(b: bool) {
     printf("%d\n", b);
 }
 
 function main() -> i32 {
     // check: 1
-    Print(1 == 1);
+    print(1 == 1);
     // nextln: 0
-    Print(1 == 2);
+    print(1 == 2);
 
     // nextln: 0
-    Print(1 != 1);
+    print(1 != 1);
     // nextln: 1
-    Print(1 != 2);
+    print(1 != 2);
 
     // nextln: 1
-    Print(1 < 2);
+    print(1 < 2);
     // nextln: 0
-    Print(1 < 0);
+    print(1 < 0);
 
     // nextln: 0
-    Print(1 > 2);
+    print(1 > 2);
     // nextln: 1
-    Print(2 > 1);
+    print(2 > 1);
 
     // nextln: 1
-    Print(1 <= 1);
+    print(1 <= 1);
     // nextln: 1
-    Print(1 <= 2);
+    print(1 <= 2);
     // nextln: 0
-    Print(2 <= 1);
+    print(2 <= 1);
 
     // nextln: 1
-    Print(1 >= 1);
+    print(1 >= 1);
     // nextln: 1
-    Print(2 >= 1);
+    print(2 >= 1);
     // nextln: 0
-    Print(1 >= 2);
+    print(1 >= 2);
 
     // check: 1
-    Print(1.0 == 1.0);
+    print(1.0 == 1.0);
     // nextln: 0
-    Print(1.0 == 2.0);
+    print(1.0 == 2.0);
 
     // nextln: 0
-    Print(1.0 != 1.0);
+    print(1.0 != 1.0);
     // nextln: 1
-    Print(1.0 != 2.0);
+    print(1.0 != 2.0);
 
     // nextln: 1
-    Print(1.0 < 2.0);
+    print(1.0 < 2.0);
     // nextln: 0
-    Print(1.0 < 0.0);
+    print(1.0 < 0.0);
 
     // nextln: 0
-    Print(1.0 > 2.0);
+    print(1.0 > 2.0);
     // nextln: 1
-    Print(2.0 > 1.0);
+    print(2.0 > 1.0);
 
     // nextln: 1
-    Print(1.0 <= 1.0);
+    print(1.0 <= 1.0);
     // nextln: 1
-    Print(1.0 <= 2.0);
+    print(1.0 <= 2.0);
     // nextln: 0
-    Print(2.0 <= 1.0);
+    print(2.0 <= 1.0);
 
     // nextln: 1
-    Print(1.0 >= 1.0);
+    print(1.0 >= 1.0);
     // nextln: 1
-    Print(2.0 >= 1.0);
+    print(2.0 >= 1.0);
     // nextln: 0
-    Print(1.0 >= 2.0);
+    print(1.0 >= 2.0);
 
 
     return 0;

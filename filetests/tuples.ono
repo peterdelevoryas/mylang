@@ -1,22 +1,22 @@
 function printf(fmt: *i8, ...) -> i32;
 
-function Print(x: (i32, *i8)) {
+function print(x: (i32, *i8)) {
     printf("%d %s\n", x.0, x.1);
 }
 
-function Map(x: (i32, *i8)) -> (i32, *i8) {
+function map(x: (i32, *i8)) -> (i32, *i8) {
     return (x.0 + 1, &x.1[1]);
 }
 
 function main() -> i32 {
     // check: 1 2
     let x = (1, "2");
-    Print(x);
+    print(x);
 
     // check 2 3
     let x = (1, "23");
-    let x = Map(x);
-    Print(x);
+    let x = map(x);
+    print(x);
 
     return 0;
 }

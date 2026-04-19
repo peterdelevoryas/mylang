@@ -5,7 +5,7 @@ type Expr = enum {
     String(*i8),
 };
 
-function Print(e: Expr) {
+function print(e: Expr) {
     if let Int(i) = e {
         printf("%d\n", i);
     }
@@ -17,10 +17,10 @@ function Print(e: Expr) {
 function main() -> i32 {
     // check: 1
     let e = Expr.Int(1);
-    Print(e);
+    print(e);
     // nextln: hello world
     e = Expr.String("hello world");
-    Print(e);
+    print(e);
 
     return 0;
 }

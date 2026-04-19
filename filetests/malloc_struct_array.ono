@@ -8,7 +8,7 @@ type Data = struct {
     z: i32,
 };
 
-function Print(x: *Data) {
+function print(x: *Data) {
     printf("%d %d %d\n", x.x, x.y, x.z);
 }
 
@@ -29,7 +29,7 @@ function main() -> i32 {
         x[i] = { x: i * 1, y: i * 2, z: i * 3, };
     }
     for let i = 0; i < n; i += 1 {
-        Print(&x[i]);
+        print(&x[i]);
     }
 
     return 0;

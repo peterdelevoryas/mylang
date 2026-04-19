@@ -6,15 +6,15 @@ type String = struct {
     ptr: *i8,
 };
 
-function MakeString(ptr: *i8) -> String {
+function make_string(ptr: *i8) -> String {
     return { ptr: ptr };
 }
 
-function Cmp(x: String, y: String) -> i32 {
+function cmp(x: String, y: String) -> i32 {
     return strcmp(x.ptr, y.ptr);
 }
 
-function Len(s: String) -> i64 {
+function len(s: String) -> i64 {
     return strlen(s.ptr);
 }
 
@@ -22,12 +22,12 @@ function main() -> i32 {
 
     // check: abcdefg
     // nextln: 7
-    let s: String = MakeString("abcdefg");
+    let s: String = make_string("abcdefg");
     printf("%s\n", s.ptr);
-    printf("%d\n", Len(s));
+    printf("%d\n", len(s));
 
     // nextln: 0
-    printf("%d\n", Cmp(s, s));
+    printf("%d\n", cmp(s, s));
 
     return 0;
 }
