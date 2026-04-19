@@ -1,10 +1,10 @@
 function printf(fmt: *i8, ...);
 
-type Data struct {
+type Data = struct {
     x: i8,
     y: i16, 
     z: i32,
-}
+};
 
 function main() -> i32 {
     let x = 1;

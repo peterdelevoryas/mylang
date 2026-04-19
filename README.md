@@ -150,11 +150,11 @@ function main() -> i32 {
 
 function printf(fmt: *i8, ...) -> i32;
 
-type Vec3 struct {
+type Vec3 = struct {
     x: f32,
     y: f32,
     z: f32,
-}
+};
 
 function Print(v: Vec3) {
     let x = v.x as f64;
@@ -186,10 +186,10 @@ function main(argc: i32, argv: **i8) -> i32 {
 
 function printf(fmt: *i8, ...);
 
-type Expr enum {
+type Expr = enum {
     Int(i32),
     String(*i8),
-}
+};
 
 function Print(e: Expr) {
     if let Int(i) = e {

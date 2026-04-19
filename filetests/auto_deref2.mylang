@@ -2,11 +2,11 @@
 
 function printf(fmt: *i8, ...) -> i32;
 
-type Vec3 struct {
+type Vec3 = struct {
     x: f32,
     y: f32,
     z: f32,
-}
+};
 
 function Print(v: Vec3) {
     let x = v.x as f64;

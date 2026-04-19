@@ -439,54 +439,61 @@ impl<'a> Parser<'a> {
         EnumVariant { name, args }
     }
 
+    fn parse_struct_fields(&mut self) -> Vec<(String, Type)> {
+        self.parse(LBRACE);
+        let mut fields = vec![];
+        while self.token != RBRACE {
+            let name = self.token_string();
+            self.parse(NAME);
+            self.parse(COLON);
+            let ty = self.parse_type();
+            fields.push((name, ty));
+            if self.token != COMMA {
+                break;
+            }
+            self.next();
+        }
+        self.parse(RBRACE);
+        fields
+    }
+
+    fn parse_enum_variants(&mut self) -> Vec<EnumVariant> {
+        self.parse(LBRACE);
+        let mut variants = vec![];
+        while self.token != RBRACE {
+            let variant = self.parse_enum_variant();
+            variants.push(variant);
+            if self.token != COMMA {
+                break;
+            }
+            self.next();
+        }
+        self.parse(RBRACE);
+        variants
+    }
+
     pub fn parse_type_decl(&mut self) -> TypeDecl {
         self.parse(TYPE);
         let name = self.token_string();
         self.parse(NAME);
+        self.parse(ASSIGN);
         let kind = match self.token {
-            ENUM => {
-                self.next();
-                self.parse(LBRACE);
-                let mut variants = vec![];
-                while self.token != RBRACE {
-                    let variant = self.parse_enum_variant();
-                    variants.push(variant);
-                    if self.token != COMMA {
-                        break;
-                    }
-                    self.next();
-                }
-                self.parse(RBRACE);
-                TypeDeclKind::Enum(variants)
-            }
             STRUCT => {
                 self.next();
-                self.parse(LBRACE);
-                let mut fields = vec![];
-                while self.token != RBRACE {
-                    let name = self.token_string();
-                    self.parse(NAME);
-                    self.parse(COLON);
-                    let ty = self.parse_type();
-                    fields.push((name, ty));
-                    if self.token != COMMA {
-                        break;
-                    }
-                    self.next();
-                }
-                self.parse(RBRACE);
+                let fields = self.parse_struct_fields();
+                self.parse(SEMICOLON);
                 TypeDeclKind::Struct(fields)
             }
-            ASSIGN => {
+            ENUM => {
                 self.next();
+                let variants = self.parse_enum_variants();
+                self.parse(SEMICOLON);
+                TypeDeclKind::Enum(variants)
+            }
+            _ => {
                 let ty = self.parse_type();
                 self.parse(SEMICOLON);
                 TypeDeclKind::Alias(ty)
-            }
-            _ => {
-                print_cursor(self.text, self.start, self.end);
-                println!("expected struct or alias type declaration");
-                error();
             }
         };
         TypeDecl { name, kind }

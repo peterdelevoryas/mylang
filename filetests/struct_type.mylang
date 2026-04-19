@@ -2,9 +2,9 @@ function printf(fmt: *i8, ...);
 function strlen(s: *i8) -> i64;
 function strcmp(s1: *i8, s2: *i8) -> i32;
 
-type String struct {
+type String = struct {
     ptr: *i8,
-}
+};
 
 function MakeString(ptr: *i8) -> String {
     return { ptr: ptr };

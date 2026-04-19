@@ -1,4 +1,4 @@
-type FILE = {};
+type FILE = struct {};
 type int = i32;
 type long = i64;
 type char = i8;

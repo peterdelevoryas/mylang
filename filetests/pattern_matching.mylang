@@ -1,9 +1,9 @@
 function printf(fmt: *i8, ...);
 
-type Expr enum {
+type Expr = enum {
     Int(i32),
     String(*i8),
-}
+};
 
 function Print(e: Expr) {
     if let Int(i) = e {

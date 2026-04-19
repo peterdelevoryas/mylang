@@ -1,11 +1,11 @@
 function printf(fmt: *i8, ...);
 
-type Person struct {
+type Person = struct {
     name: *i8,
     height: f32,
     weight: f32,
     age: i32,
-}
+};
 
 // field accesses on pointers to structs are auto-deref'd
 function PrintPerson(p: *Person) {

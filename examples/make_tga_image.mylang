@@ -8,22 +8,22 @@ function fopen(path: *i8, mode: *i8) -> *FILE;
 function fwrite(ptr: *i8, size: i64, nitems: i64, stream: *FILE) -> i64;
 function fclose(stream: *FILE) -> i32;
 
-type Point struct {
+type Point = struct {
     x: i32,
     y: i32,
-}
+};
 
-type Pixel struct {
+type Pixel = struct {
     b: i8,
     g: i8,
     r: i8,
-}
+};
 
-type Image struct {
+type Image = struct {
     pixels: *Pixel,
     width: i32,
     height: i32,
-}
+};
 
 function NewImage(width: i32, height: i32) -> Image {
     let size = width as i64 * height as i64 * sizeof(Pixel);
