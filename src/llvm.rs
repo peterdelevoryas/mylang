@@ -1,3 +1,5 @@
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use crate::error;
 use crate::ir::*;
 use llvm_sys::*;
@@ -6,7 +8,7 @@ use std::ffi::CStr;
 use std::ops::Deref;
 use std::ptr;
 
-extern "C" {
+unsafe extern "C" {
     fn LLVMBuildPtrDiff2(
         arg1: LLVMBuilderRef,
         elem_ty: LLVMTypeRef,

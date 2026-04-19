@@ -5,7 +5,7 @@ members = ["llvm-sys"]
 name = "ono"
 version = "0.1.0"
 authors = ["Peter Delevoryas <me@peterd.net>"]
-edition = "2018"
+edition = "2024"
 
 [[bin]]
 name = "ono"
