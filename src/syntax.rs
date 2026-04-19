@@ -68,6 +68,8 @@ pub enum Token {
     LSHIFT,
     RSHIFT,
     AND,
+    OR,
+    XOR,
     ENUM,
     BREAK,
     CONTINUE,
@@ -347,6 +349,8 @@ impl<'a> Parser<'a> {
                 // keywords
                 let token = match &text[..n] {
                     b"and" => AND,
+                    b"or" => OR,
+                    b"xor" => XOR,
                     b"enum" => ENUM,
                     b"break" => BREAK,
                     b"continue" => CONTINUE,
@@ -721,7 +725,7 @@ impl<'a> Parser<'a> {
     fn parse_binary(&mut self, mut lhs: Expr, min_precedence: i32) -> Expr {
         fn precedence(op: Token) -> i32 {
             match op {
-                AND => 0,
+                AND | OR | XOR => 0,
                 LT | GT | LE | GE | EQ | NE => 10,
                 AMPERSAND | LSHIFT | RSHIFT => 15,
                 PLUS | MINUS => 20,

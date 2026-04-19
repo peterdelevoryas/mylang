@@ -790,6 +790,8 @@ impl<'a> StmtBuilder<'a> {
                     (Binop::Mul, Int) => LLVMBuildMul(self.bld, x, y, cstr!("")),
                     (Binop::Div, Int) => LLVMBuildSDiv(self.bld, x, y, cstr!("")),
                     (Binop::And, Int) => LLVMBuildAnd(self.bld, x, y, cstr!("")),
+                    (Binop::Or, Int) => LLVMBuildOr(self.bld, x, y, cstr!("")),
+                    (Binop::Xor, Int) => LLVMBuildXor(self.bld, x, y, cstr!("")),
                     (Binop::Shl, Int) => LLVMBuildShl(self.bld, x, y, cstr!("")),
                     (Binop::Shr, Int) => LLVMBuildLShr(self.bld, x, y, cstr!("")),
 

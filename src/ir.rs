@@ -682,6 +682,8 @@ impl<'a> FuncBuilder<'a> {
                     syntax::EQ => Binop::Cmp(Predicate::Eq),
                     syntax::NE => Binop::Cmp(Predicate::Ne),
                     syntax::AND => Binop::And,
+                    syntax::OR => Binop::Or,
+                    syntax::XOR => Binop::Xor,
                     syntax::AMPERSAND => Binop::And,
                     syntax::LSHIFT => Binop::Shl,
                     syntax::RSHIFT => Binop::Shr,
@@ -1109,6 +1111,8 @@ pub enum Unop {
 #[derive(Debug, Copy, Clone)]
 pub enum Binop {
     And,
+    Or,
+    Xor,
     Add,
     Sub,
     Mul,

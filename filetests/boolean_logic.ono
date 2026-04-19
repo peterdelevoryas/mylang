@@ -1,0 +1,36 @@
+function printf(fmt: *i8, ...);
+
+function print(b: bool) {
+    printf("%d\n", b);
+}
+
+function main() -> i32 {
+    // check: 0
+    print(false and false);
+    // nextln: 0
+    print(false and true);
+    // nextln: 0
+    print(true and false);
+    // nextln: 1
+    print(true and true);
+
+    // nextln: 0
+    print(false or false);
+    // nextln: 1
+    print(false or true);
+    // nextln: 1
+    print(true or false);
+    // nextln: 1
+    print(true or true);
+
+    // nextln: 0
+    print(false xor false);
+    // nextln: 1
+    print(false xor true);
+    // nextln: 1
+    print(true xor false);
+    // nextln: 0
+    print(true xor true);
+
+    return 0;
+}
