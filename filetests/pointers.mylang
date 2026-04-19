@@ -1,6 +1,6 @@
 fn printf(fmt: *i8, ...);
 
-type data struct {
+type Data struct {
     x: i8,
     y: i16, 
     z: i32,
@@ -12,7 +12,7 @@ fn main() -> i32 {
     // check: 1
     printf("%d\n", *p);
 
-    let x: data = {
+    let x: Data = {
         x: 0,
         y: 1,
         z: 2,

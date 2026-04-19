@@ -1,26 +1,26 @@
 fn printf(fmt: *i8, ...);
 
-type expr enum {
-    int(i32),
-    string(*i8),
+type Expr enum {
+    Int(i32),
+    String(*i8),
 }
 
-fn print(e: expr) {
-    if let int(i) = e {
+fn Print(e: Expr) {
+    if let Int(i) = e {
         printf("%d\n", i);
     }
-    if let string(s) = e {
+    if let String(s) = e {
         printf("%s\n", s);
     }
 }
 
 fn main() -> i32 {
     // check: 1
-    let e = expr.int(1);
-    print(e);
+    let e = Expr.Int(1);
+    Print(e);
     // nextln: hello world
-    e = expr.string("hello world");
-    print(e);
+    e = Expr.String("hello world");
+    Print(e);
 
     return 0;
 }

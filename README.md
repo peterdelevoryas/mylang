@@ -61,7 +61,7 @@ fn printf(fmt: *i8, ...) -> i32;
 fn strcmp(x: *i8, y: *i8) -> i32;
 
 // Returns (filename, -)
-fn parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
+fn ParseArgs(argc: i32, argv: **i8) -> (*i8, bool) {
     let file: *i8 = null;
     let help = false;
     for let i = 1; i < argc; i += 1 {
@@ -76,7 +76,7 @@ fn parse_args(argc: i32, argv: **i8) -> (*i8, bool) {
 }
 
 fn main(argc: i32, argv: **i8) -> i32 {
-    let (file, help) = parse_args(argc, argv);
+    let (file, help) = ParseArgs(argc, argv);
     printf("help = %d, file = %s\n", help, file);
     if help {
         printf("usage: mylangc [-h] <file>\n");
@@ -95,9 +95,9 @@ fn main(argc: i32, argv: **i8) -> i32 {
 
 fn printf(fmt: *i8, ...) -> i32;
 
-type mat4 = [4][4]f32;
+type Mat4 = [4][4]f32;
 
-fn matmul(A: mat4, B: mat4) -> mat4 {
+fn MatMul(A: Mat4, B: Mat4) -> Mat4 {
     let xx = A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[2][0] + A[0][3] * B[3][0];
     let xy = A[0][0] * B[0][1] + A[0][1] * B[1][1] + A[0][2] * B[2][1] + A[0][3] * B[3][1];
     let xz = A[0][0] * B[0][2] + A[0][1] * B[1][2] + A[0][2] * B[2][2] + A[0][3] * B[3][2];
@@ -124,7 +124,7 @@ fn matmul(A: mat4, B: mat4) -> mat4 {
             [wx, wy, wz, ww]];
 }
 
-fn print(A: mat4) {
+fn Print(A: Mat4) {
     for let i = 0; i < 4; i += 1 {
         for let j = 0; j < 4; j += 1 {
             printf("%10.4f  ", A[i][j] as f64);
@@ -138,9 +138,9 @@ fn main() -> i32 {
              [ 2.0, -4.0,  5.0,  0.5],
              [-3.0,  1.0,  6.0, -3.0],
              [ 6.0, 10.0, 11.0,  1.0]];
-    let B = matmul(A, A);
-    print(A);
-    print(B);
+    let B = MatMul(A, A);
+    Print(A);
+    Print(B);
     return 0;
 }
 ```
@@ -150,13 +150,13 @@ fn main() -> i32 {
 
 fn printf(fmt: *i8, ...) -> i32;
 
-type vec3 struct {
+type Vec3 struct {
     x: f32,
     y: f32,
     z: f32,
 }
 
-fn print(v: vec3) {
+fn Print(v: Vec3) {
     let x = v.x as f64;
     let y = v.y as f64;
     let z = v.z as f64;
@@ -164,17 +164,17 @@ fn print(v: vec3) {
 }
 
 // Field accesses on pointers to structs are auto-deref'd.
-fn dot(x: *vec3, y: *vec3) -> f32 {
+fn Dot(x: *Vec3, y: *Vec3) -> f32 {
     return x.x * y.x + x.y * y.y + x.z * y.z;
 }
 
 fn main(argc: i32, argv: **i8) -> i32 {
-    let a: vec3 = { x: 1.0, y: 2.0, z: 3.0, };
-    let b: vec3 = { x: 2.0, y: 3.0, z: 4.0, };
-    print(a);
-    print(b);
+    let a: Vec3 = { x: 1.0, y: 2.0, z: 3.0, };
+    let b: Vec3 = { x: 2.0, y: 3.0, z: 4.0, };
+    Print(a);
+    Print(b);
 
-    let ab = dot(&a, &b);
+    let ab = Dot(&a, &b);
     printf("dot a, b = %f\n", ab as f64);
 
     return 0;
@@ -186,26 +186,26 @@ fn main(argc: i32, argv: **i8) -> i32 {
 
 fn printf(fmt: *i8, ...);
 
-type expr enum {
-    int(i32),
-    string(*i8),
+type Expr enum {
+    Int(i32),
+    String(*i8),
 }
 
-fn print(e: expr) {
-    if let int(i) = e {
+fn Print(e: Expr) {
+    if let Int(i) = e {
         printf("%d\n", i);
     }
-    if let string(s) = e {
+    if let String(s) = e {
         printf("%s\n", s);
     }
 }
 
 fn main() -> i32 {
-    let e = expr.int(1);
-    print(e);
+    let e = Expr.Int(1);
+    Print(e);
 
-    e = expr.string("hello world");
-    print(e);
+    e = Expr.String("hello world");
+    Print(e);
 
     return 0;
 }

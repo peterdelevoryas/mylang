@@ -8,28 +8,28 @@ fn fopen(path: *i8, mode: *i8) -> *FILE;
 fn fwrite(ptr: *i8, size: i64, nitems: i64, stream: *FILE) -> i64;
 fn fclose(stream: *FILE) -> i32;
 
-type point struct {
+type Point struct {
     x: i32,
     y: i32,
 }
 
-type pixel struct {
+type Pixel struct {
     b: i8,
     g: i8,
     r: i8,
 }
 
-type image struct {
-    pixels: *pixel,
+type Image struct {
+    pixels: *Pixel,
     width: i32,
     height: i32,
 }
 
-fn new_image(width: i32, height: i32) -> image {
-    let size = width as i64 * height as i64 * sizeof(pixel);
+fn NewImage(width: i32, height: i32) -> Image {
+    let size = width as i64 * height as i64 * sizeof(Pixel);
     let pixels = malloc(size);
     memset(pixels, 0, size);
-    let pixels = pixels as *pixel;
+    let pixels = pixels as *Pixel;
     return {
         pixels: pixels,
         width: width,
@@ -37,7 +37,7 @@ fn new_image(width: i32, height: i32) -> image {
     };
 }
 
-fn set_pixel(image: image, p: point, color: pixel) {
+fn SetPixel(image: Image, p: Point, color: Pixel) {
     if p.x >= image.width {
         return;
     }
@@ -47,59 +47,59 @@ fn set_pixel(image: image, p: point, color: pixel) {
     image.pixels[image.width * p.y + p.x] = color;
 }
 
-fn abs(x: i32) -> i32 {
+fn Abs(x: i32) -> i32 {
     if x < 0 {
         return -1 * x;
     }
     return x;
 }
 
-fn swap_i32(x: *i32, y: *i32) {
+fn SwapI32(x: *i32, y: *i32) {
     let tmp = *x;
     *x = *y;
     *y = tmp;
 }
 
-fn swap_points(x: *point, y: *point) {
+fn SwapPoints(x: *Point, y: *Point) {
     let tmp = *x;
     *x = *y;
     *y = tmp;
 }
 
-fn draw_line(image: image, a: point, b: point, color: pixel) {
+fn DrawLine(image: Image, a: Point, b: Point, color: Pixel) {
     let steep = false;
-    if abs(a.x - b.x) < abs(a.y - b.y) {
-        swap_i32(&a.x, &a.y);
-        swap_i32(&b.x, &b.y);
+    if Abs(a.x - b.x) < Abs(a.y - b.y) {
+        SwapI32(&a.x, &a.y);
+        SwapI32(&b.x, &b.y);
         steep = true;
     }
     if a.x > b.x {
-        swap_points(&a, &b);
+        SwapPoints(&a, &b);
     }
     let m = (b.y - a.y) as f32 / (b.x - a.x) as f32;
     for let x = a.x; x <= b.x; x += 1 {
         let dx = (x - a.x) as f32;
         let y = m * dx + a.y as f32;
-        let p: point = { x: x, y: y as i32 };
+        let p: Point = { x: x, y: y as i32 };
         if steep {
-            swap_i32(&p.x, &p.y);
+            SwapI32(&p.x, &p.y);
         }
-        set_pixel(image, p, color);
+        SetPixel(image, p, color);
     }
 }
 
-fn draw_grid(image: image) {
+fn DrawGrid(image: Image) {
     let spacing = 50;
     for let x = spacing; x < image.width; x += spacing {
         for let y = spacing; y < image.height; y += spacing {
-            draw_line(image, { x: x, y: 0 }, { x: x, y: image.height }, { b: 0, g: 0, r: 255 });
-            draw_line(image, { x: 0, y: y }, { x: image.width, y: y }, { b: 0, g: 0, r: 255 });
+            DrawLine(image, { x: x, y: 0 }, { x: x, y: image.height }, { b: 0, g: 0, r: 255 });
+            DrawLine(image, { x: 0, y: y }, { x: image.width, y: y }, { b: 0, g: 0, r: 255 });
         }
     }
 }
 
-fn flip_image(image: image) {
-    let row_size = image.width as i64 * sizeof(pixel);
+fn FlipImage(image: Image) {
+    let row_size = image.width as i64 * sizeof(Pixel);
     let tmp = malloc(row_size);
 
     for let row = 0; row < image.height / 2; row += 1 {
@@ -113,27 +113,27 @@ fn flip_image(image: image) {
     free(tmp);
 }
 
-fn split_i16(x: i16) -> (i8, i8)  {
+fn SplitI16(x: i16) -> (i8, i8)  {
     let lower = ((x >> 0) & 255) as i8;
     let upper = ((x >> 8) & 255) as i8;
     return (lower, upper);
 }
 
-fn write_tga_file(image: image, path: *i8) {
-    let pixels_size = image.width as i64 * image.height as i64 * sizeof(pixel);
+fn WriteTgaFile(image: Image, path: *i8) {
+    let pixels_size = image.width as i64 * image.height as i64 * sizeof(Pixel);
     let header_size: i64 = 18;
     let output_size = header_size + pixels_size;
     let output = malloc(output_size);
 
     memset(output, 0, header_size);
     output[2] = 2;
-    let (x, y) = split_i16(image.width as i16);
+    let (x, y) = SplitI16(image.width as i16);
     output[12] = x;
     output[13] = y;
-    let (x, y) = split_i16(image.height as i16);
+    let (x, y) = SplitI16(image.height as i16);
     output[14] = x;
     output[15] = y;
-    output[16] = (sizeof(pixel) * 8) as i8;
+    output[16] = (sizeof(Pixel) * 8) as i8;
     output[17] = 32;
 
     memcpy(output + header_size as i32, image.pixels as *i8, pixels_size);
@@ -145,8 +145,8 @@ fn write_tga_file(image: image, path: *i8) {
 }
 
 fn main() {
-    let image = new_image(200, 200);
-    draw_grid(image);
-    flip_image(image);
-    write_tga_file(image, "output.tga");
+    let image = NewImage(200, 200);
+    DrawGrid(image);
+    FlipImage(image);
+    WriteTgaFile(image, "output.tga");
 }

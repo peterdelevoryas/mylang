@@ -1,21 +1,20 @@
 fn printf(fmt: *i8, ...);
 
-type expr enum {
-    int(i32),
-    string(*i8),
+type Expr enum {
+    Int(i32),
+    String(*i8),
 }
 
 fn main() -> i32 {
     // check: 1
-    let e = expr.int(1);
-    let int(i) = e;
+    let e = Expr.Int(1);
+    let Int(i) = e;
     printf("%d\n", i);
 
     // nextln: hello world
-    let x = expr.string("hello world");
-    let string(s) = x;
+    let x = Expr.String("hello world");
+    let String(s) = x;
     printf("%s\n", s);
 
     return 0;
 }
-
