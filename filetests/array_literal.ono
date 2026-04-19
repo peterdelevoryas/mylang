@@ -1,17 +1,17 @@
 function printf(fmt: *i8, ...);
 
 function main() -> i32 {
-    // check: 1 2 3
-    let x = [1, 2, 3];
-    printf("%d %d %d\n", x[0], x[1], x[2]);
+  // check: 1 2 3
+  let x = [1, 2, 3];
+  printf("%d %d %d\n", x[0], x[1], x[2]);
 
-    // nextln: 2 3 4
-    x[0] = x[1];
-    x[1] = x[2];
-    x[2] = 4;
-    printf("%d %d %d\n", x[0], x[1], x[2]);
+  // nextln: 2 3 4
+  x[0] = x[1];
+  x[1] = x[2];
+  x[2] = 4;
+  printf("%d %d %d\n", x[0], x[1], x[2]);
 
-    let x: [0]i32 = [];
+  let x: [0]i32 = [];
 
-    return 0;
+  return 0;
 }

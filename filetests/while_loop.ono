@@ -1,14 +1,14 @@
 function printf(fmt: *i8, ...);
 
 function main() -> i32 {
-    // check: 0123456789
-    let i = 0;
-    while i < 10 {
-        printf("%d", i);
-        i += 1;
-    }
-    printf("\n");
-    return 0;
+  // check: 0123456789
+  let i = 0;
+  while i < 10 {
+    printf("%d", i);
+    i += 1;
+  }
+  printf("\n");
+  return 0;
 }
 
 

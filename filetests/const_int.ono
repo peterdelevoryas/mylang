@@ -3,8 +3,8 @@ function printf(fmt: *i8, ...);
 const RAND_MAX = 2147483647;
 
 function main() -> i32 {
-    // check: 2147483647
-    printf("%d\n", RAND_MAX);
-    return 0;
+  // check: 2147483647
+  printf("%d\n", RAND_MAX);
+  return 0;
 }
 

@@ -3,6 +3,6 @@ function printf(fmt: *i8, ...);
 // check: hello world
 
 function main() -> i32 {
-    printf("hello world\n");
-    return 0;
+  printf("hello world\n");
+  return 0;
 }

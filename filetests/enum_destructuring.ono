@@ -1,20 +1,20 @@
 function printf(fmt: *i8, ...);
 
 type Expr = enum {
-    Int(i32),
-    String(*i8),
+  Int(i32),
+  String(*i8),
 };
 
 function main() -> i32 {
-    // check: 1
-    let e = Expr.Int(1);
-    let Int(i) = e;
-    printf("%d\n", i);
+  // check: 1
+  let e = Expr.Int(1);
+  let Int(i) = e;
+  printf("%d\n", i);
 
-    // nextln: hello world
-    let x = Expr.String("hello world");
-    let String(s) = x;
-    printf("%s\n", s);
+  // nextln: hello world
+  let x = Expr.String("hello world");
+  let String(s) = x;
+  printf("%s\n", s);
 
-    return 0;
+  return 0;
 }

@@ -2,15 +2,15 @@ function printf(fmt: *i8, ...);
 
 function main() -> i32 {
 
-    // check: true
-    if true {
-        printf("true\n");
-    }
+  // check: true
+  if true {
+    printf("true\n");
+  }
 
-    // not: false
-    if false {
-        printf("false\n");
-    }
+  // not: false
+  if false {
+    printf("false\n");
+  }
 
-    return 0;
+  return 0;
 }

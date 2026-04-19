@@ -3,31 +3,31 @@ function strlen(s: *i8) -> i64;
 function strcmp(s1: *i8, s2: *i8) -> i32;
 
 type String = struct {
-    ptr: *i8,
+  ptr: *i8,
 };
 
 function make_string(ptr: *i8) -> String {
-    return { ptr: ptr };
+  return { ptr: ptr };
 }
 
 function cmp(x: String, y: String) -> i32 {
-    return strcmp(x.ptr, y.ptr);
+  return strcmp(x.ptr, y.ptr);
 }
 
 function len(s: String) -> i64 {
-    return strlen(s.ptr);
+  return strlen(s.ptr);
 }
 
 function main() -> i32 {
 
-    // check: abcdefg
-    // nextln: 7
-    let s: String = make_string("abcdefg");
-    printf("%s\n", s.ptr);
-    printf("%d\n", len(s));
+  // check: abcdefg
+  // nextln: 7
+  let s: String = make_string("abcdefg");
+  printf("%s\n", s.ptr);
+  printf("%d\n", len(s));
 
-    // nextln: 0
-    printf("%d\n", cmp(s, s));
+  // nextln: 0
+  printf("%d\n", cmp(s, s));
 
-    return 0;
+  return 0;
 }

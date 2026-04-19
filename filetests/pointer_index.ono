@@ -3,15 +3,15 @@ function malloc(size: i64) -> *i8;
 function free(ptr: *i8);
 
 function main() -> i32 {
-    // check: 0123456789
-    let x = malloc(10);
-    for let i = 0; i < 10; i += 1 {
-        x[i] = i as i8;
-    }
-    for let i = 0; i < 10; i += 1 {
-        printf("%d", x[i]);
-    }
-    printf("\n");
-    free(x);
-    return 0;
+  // check: 0123456789
+  let x = malloc(10);
+  for let i = 0; i < 10; i += 1 {
+    x[i] = i as i8;
+  }
+  for let i = 0; i < 10; i += 1 {
+    printf("%d", x[i]);
+  }
+  printf("\n");
+  free(x);
+  return 0;
 }
