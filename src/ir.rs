@@ -140,6 +140,42 @@ struct FuncBuilder<'a> {
 }
 
 impl<'a> FuncBuilder<'a> {
+    fn expr_error(&self, e: &syntax::Expr, message: &str) -> ! {
+        let start = e.span.0 as usize;
+        let end = e.span.1 as usize;
+        print_cursor(self.text, start, end);
+        println!("{}", message);
+        error();
+    }
+
+    fn is_modifiable_lvalue(&self, e: &Expr) -> bool {
+        match e.kind {
+            ExprKind::Local(_)
+            | ExprKind::Param(_)
+            | ExprKind::Field(_, _)
+            | ExprKind::Index(_, _)
+            | ExprKind::Unary(Unop::Deref, _) => true,
+            _ => false,
+        }
+    }
+
+    fn check_post_inc_type(&self, e: &syntax::Expr, ty: TypeId) {
+        match self.module.types.get(ty) {
+            Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::F32
+            | Type::F64
+            | Type::Pointer(_) => {}
+            Type::Bool => self.expr_error(e, "postfix ++ is not allowed on bool"),
+            ty => {
+                let message = format!("postfix ++ is not allowed on {:?}", ty);
+                self.expr_error(e, &message);
+            }
+        }
+    }
+
     fn build_body(mut self, block: &syntax::Block) -> FuncBody {
         let scope = self.module.names.enter_scope();
         let decl = &self.module.func_decls[self.body.id];
@@ -465,6 +501,15 @@ impl<'a> FuncBuilder<'a> {
                     _ => panic!(),
                 };
                 (ExprKind::Index(p.into(), i.into()), ty)
+            }
+            syntax::ExprKind::PostInc(e1) => {
+                let e1 = self.build_expr(e1, None);
+                if !self.is_modifiable_lvalue(&e1) {
+                    self.expr_error(e, "expected modifiable lvalue in postfix ++");
+                }
+                self.check_post_inc_type(e, e1.ty);
+                let ty = e1.ty;
+                (ExprKind::PostInc(e1.into()), ty)
             }
             syntax::ExprKind::Unary(op, e) => match op {
                 syntax::AMPERSAND => {
@@ -813,6 +858,10 @@ impl ModuleBuilder {
                 };
                 Expr { kind, ty }
             }
+            syntax::ExprKind::PostInc(_) => {
+                println!("postfix ++ not allowed in const expression");
+                error();
+            }
             e => panic!("infer const expr {:?}", e),
         }
     }
@@ -1142,6 +1191,7 @@ pub enum ExprKind {
     Tuple(Vec<Expr>),
     Field(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
+    PostInc(Box<Expr>),
     Cast(Box<Expr>, TypeId),
     Bool(bool),
     Char(u8),

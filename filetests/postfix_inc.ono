@@ -1,0 +1,35 @@
+function printf(fmt: *i8, ...);
+
+function main() -> i32 {
+    let x = 1;
+    let y = x++;
+    // check: 1 2
+    printf("%d %d\n", y, x);
+
+    let s = "ab";
+    let first = *s++;
+    // nextln: a b
+    printf("%c %c\n", first, *s);
+
+    let z = 10;
+    let p = &z;
+    let old = (*p)++;
+    // nextln: 10 11
+    printf("%d %d\n", old, z);
+
+    let xs = [4, 5];
+    let idx_old = xs[1]++;
+    // nextln: 5 6
+    printf("%d %d\n", idx_old, xs[1]);
+
+    // nextln: 5 6
+    // nextln: 6
+    printf("%d\n", bump(5));
+    return 0;
+}
+
+function bump(x: i32) -> i32 {
+    let y = x++;
+    printf("%d %d\n", y, x);
+    return x;
+}

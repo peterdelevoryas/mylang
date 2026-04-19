@@ -309,6 +309,28 @@ unsafe fn build_func_body(
         TypeKind::Scalar => None,
     };
 
+    let mut params = vec![];
+    let mut llvm_param_i = 0;
+    for &ty in &func.ty.params {
+        match type_bld.irtype(ty).kind() {
+            TypeKind::Unit => params.push(ptr::null_mut()),
+            TypeKind::Aggregate => {
+                let param = LLVMGetParam(llfunc, llvm_param_i);
+                params.push(param);
+                llvm_param_i += 1;
+            }
+            TypeKind::Scalar => {
+                let lltype = type_bld.lltype(ty);
+                let p = LLVMBuildAlloca(b, lltype, cstr!(""));
+                let param = LLVMGetParam(llfunc, llvm_param_i);
+                LLVMBuildStore(b, param, p);
+                params.push(p);
+                llvm_param_i += 1;
+            }
+        }
+    }
+    let params = &params;
+
     let mut locals = vec![];
     for &ty in &body.locals {
         let lltype = type_bld.lltype(ty);
@@ -324,6 +346,7 @@ unsafe fn build_func_body(
         llfuncs: llfuncs,
         llconsts: llconsts,
         llfunc: llfunc,
+        params: params,
         locals: locals,
         sret: sret,
 
@@ -346,6 +369,7 @@ struct StmtBuilder<'a> {
     llconsts: &'a [LLVMValueRef],
 
     llfunc: LLVMValueRef,
+    params: &'a [LLVMValueRef],
     locals: &'a [LLVMValueRef],
     sret: Option<LLVMValueRef>,
 
@@ -485,7 +509,7 @@ impl<'a> StmtBuilder<'a> {
     unsafe fn build_place(&mut self, e: &Expr) -> LLVMValueRef {
         match &e.kind {
             &ExprKind::Local(i) => self.locals[i],
-            &ExprKind::Param(i) => LLVMGetParam(self.llfunc, i as u32),
+            &ExprKind::Param(i) => self.params[i],
             ExprKind::Index(p, i) => {
                 let elem = self.index_element_type(p.ty);
                 let ty = self.tybld.irtype(p.ty);
@@ -654,8 +678,7 @@ impl<'a> StmtBuilder<'a> {
                 let _ = self.build_call(func, args, Some(dst));
             }
             ExprKind::Param(i) => {
-                let i = *i as u32;
-                let param = LLVMGetParam(self.llfunc, i);
+                let param = self.params[*i];
                 self.copy(e.ty, param, dst);
             }
             ExprKind::Unary(Unop::Deref, p) => {
@@ -715,6 +738,7 @@ impl<'a> StmtBuilder<'a> {
             | ExprKind::Type
             | ExprKind::Unary(_, _)
             | ExprKind::Binary(_, _, _)
+            | ExprKind::PostInc(_)
             | ExprKind::String(_)
             | ExprKind::Cast(_, _)
             | ExprKind::Bool(_)
@@ -774,7 +798,11 @@ impl<'a> StmtBuilder<'a> {
                 let p = self.locals[*i];
                 LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
             }
-            ExprKind::Param(i) => LLVMGetParam(self.llfunc, *i as u32),
+            ExprKind::Param(i) => {
+                let lltype = self.tybld.lltype(e.ty);
+                let p = self.params[*i];
+                LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
+            }
             ExprKind::Func(i) => self.llfuncs[*i],
             ExprKind::Binary(op, x, y) => {
                 let x_ty = x.ty;
@@ -902,6 +930,30 @@ impl<'a> StmtBuilder<'a> {
                 let lltype = self.tybld.lltype(e.ty);
                 let p = self.build_scalar(p);
                 LLVMBuildLoad2(self.bld, lltype, p, cstr!(""))
+            }
+            ExprKind::PostInc(e1) => {
+                let p = self.build_place(e1);
+                let lltype = self.tybld.lltype(e.ty);
+                let old = LLVMBuildLoad2(self.bld, lltype, p, cstr!(""));
+                let new = match self.tybld.irtype(e.ty) {
+                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => {
+                        let one = LLVMConstInt(lltype, 1, 0);
+                        LLVMBuildAdd(self.bld, old, one, cstr!(""))
+                    }
+                    Type::F32 | Type::F64 => {
+                        let one = LLVMConstReal(lltype, 1.0);
+                        LLVMBuildFAdd(self.bld, old, one, cstr!(""))
+                    }
+                    Type::Pointer(_) => {
+                        let elem = self.index_element_type(e.ty);
+                        let one = LLVMConstInt(LLVMInt32Type(), 1, 0);
+                        let mut idx = [one];
+                        LLVMBuildGEP2(self.bld, elem, old, idx.as_mut_ptr(), 1, cstr!(""))
+                    }
+                    ty => panic!("postfix ++ not allowed on {:?}", ty),
+                };
+                LLVMBuildStore(self.bld, new, p);
+                old
             }
             ExprKind::Sizeof(ty) => {
                 let lltype = self.tybld.lltype(*ty);

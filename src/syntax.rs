@@ -76,6 +76,7 @@ pub enum Token {
     NULL,
     CONST,
     SIZEOF,
+    PLUSPLUS,
     STAREQ,
     SLASHEQ,
     PLUSEQ,
@@ -230,6 +231,7 @@ pub enum ExprKind {
     Field(Box<Expr>, String),
     TupleField(Box<Expr>, u32),
     Index(Box<Expr>, Box<Expr>),
+    PostInc(Box<Expr>),
     Cast(Box<Expr>, Type),
     Bool(bool),
     Sizeof(Type),
@@ -286,6 +288,7 @@ impl<'a> Parser<'a> {
             '>' if d == '>' => (RSHIFT, 2),
             '<' if d == '<' => (LSHIFT, 2),
             '-' if d == '>' => (ARROW, 2),
+            '+' if d == '+' => (PLUSPLUS, 2),
             '-' if d == '-' => (MINUSEQ, 2),
             '+' if d == '=' => (PLUSEQ, 2),
             '*' if d == '=' => (STAREQ, 2),
@@ -785,8 +788,21 @@ impl<'a> Parser<'a> {
                     span: (start as u16, self.end as u16),
                 }
             }
-            _ => self.parse_call(),
+            _ => self.parse_postfix(),
         }
+    }
+
+    fn parse_postfix(&mut self) -> Expr {
+        let start = self.start;
+        let mut x = self.parse_call();
+        while self.token == PLUSPLUS {
+            self.next();
+            x = Expr {
+                kind: ExprKind::PostInc(x.into()),
+                span: (start as u16, self.end as u16),
+            };
+        }
+        x
     }
 
     fn parse_index(&mut self) -> Expr {
