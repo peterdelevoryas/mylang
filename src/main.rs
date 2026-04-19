@@ -13,7 +13,7 @@ mod syntax;
 fn usage() {
     println!(
         "\
-OVERVIEW: ono LLVM compiler
+OVERVIEW: ono compiler
 
 USAGE: ono [options] file...
 
