@@ -27,6 +27,18 @@ The `filetests/` directory contains examples of all language features, below
 some are reproduced with added comments.
 
 ```
+// Explicit libc namespace import.
+
+import libc;
+
+function main() -> i32 {
+    let p = libc.malloc(64);
+    libc.printf("ptr = %p\n", p);
+    return 0;
+}
+```
+
+```
 // Hello world
 
 // You can (and must) declare externally defined functions to link with.

@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 type Vec3 = struct {
   x: f32,
@@ -15,6 +15,6 @@ function main() -> i32 {
   let y: Vec3 = { x: 7.0, y: 8.0, z: 9.0, };
   let p = dot(x, y);
   // check: 50.000000
-  printf("%f\n", p as f64);
+  libc.printf("%f\n", p as f64);
   return 0;
 }

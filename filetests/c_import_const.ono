@@ -1,0 +1,8 @@
+import libc;
+
+function main() -> i32 {
+  libc.printf("%d\n", libc.RAND_MAX);
+  return 0;
+}
+
+// CHECK: 2147483647

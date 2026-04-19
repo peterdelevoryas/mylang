@@ -1,6 +1,4 @@
-function printf(fmt: *i8, ...);
-function malloc(size: i64) -> *i8;
-function free(ptr: *i8);
+import libc;
 
 type Data = struct {
   x: i32,
@@ -9,7 +7,7 @@ type Data = struct {
 };
 
 function print(x: *Data) {
-  printf("%d %d %d\n", x.x, x.y, x.z);
+  libc.printf("%d %d %d\n", x.x, x.y, x.z);
 }
 
 function main() -> i32 {
@@ -24,7 +22,7 @@ function main() -> i32 {
   // nextln: 8 16 24
   // nextln: 9 18 27
   let n = 10;
-  let x: *Data = malloc(sizeof(Data) * (n as i64)) as *Data;
+  let x: *Data = libc.malloc(sizeof(Data) * (n as i64)) as *Data;
   for let i = 0; i < n; i += 1 {
     x[i] = { x: i * 1, y: i * 2, z: i * 3, };
   }

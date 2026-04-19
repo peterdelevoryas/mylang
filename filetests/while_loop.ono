@@ -1,14 +1,13 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 function main() -> i32 {
   // check: 0123456789
   let i = 0;
   while i < 10 {
-    printf("%d", i);
+    libc.printf("%d", i);
     i += 1;
   }
-  printf("\n");
+  libc.printf("\n");
   return 0;
 }
-
 

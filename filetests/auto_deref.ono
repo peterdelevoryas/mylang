@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 type Person = struct {
   name: *i8,
@@ -9,10 +9,10 @@ type Person = struct {
 
 // field accesses on pointers to structs are auto-deref'd
 function print_person(p: *Person) {
-  printf("name: %s\n", p.name);
-  printf("height: %f\n", p.height as f64);
-  printf("weight: %f\n", p.weight as f64);
-  printf("age: %d\n", p.age);
+  libc.printf("name: %s\n", p.name);
+  libc.printf("height: %f\n", p.height as f64);
+  libc.printf("weight: %f\n", p.weight as f64);
+  libc.printf("age: %d\n", p.age);
 }
 
 function main() -> i32 {

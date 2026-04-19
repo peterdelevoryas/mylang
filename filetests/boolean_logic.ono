@@ -1,7 +1,7 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 function print(b: bool) {
-  printf("%d\n", b);
+  libc.printf("%d\n", b);
 }
 
 function main() -> i32 {

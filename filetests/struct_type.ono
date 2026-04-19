@@ -1,6 +1,4 @@
-function printf(fmt: *i8, ...);
-function strlen(s: *i8) -> i64;
-function strcmp(s1: *i8, s2: *i8) -> i32;
+import libc;
 
 type String = struct {
   ptr: *i8,
@@ -11,11 +9,11 @@ function make_string(ptr: *i8) -> String {
 }
 
 function cmp(x: String, y: String) -> i32 {
-  return strcmp(x.ptr, y.ptr);
+  return libc.strcmp(x.ptr, y.ptr);
 }
 
 function len(s: String) -> i64 {
-  return strlen(s.ptr);
+  return libc.strlen(s.ptr);
 }
 
 function main() -> i32 {
@@ -23,11 +21,11 @@ function main() -> i32 {
   // check: abcdefg
   // nextln: 7
   let s: String = make_string("abcdefg");
-  printf("%s\n", s.ptr);
-  printf("%d\n", len(s));
+  libc.printf("%s\n", s.ptr);
+  libc.printf("%d\n", len(s));
 
   // nextln: 0
-  printf("%d\n", cmp(s, s));
+  libc.printf("%d\n", cmp(s, s));
 
   return 0;
 }

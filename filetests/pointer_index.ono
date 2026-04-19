@@ -1,17 +1,15 @@
-function printf(fmt: *i8, ...);
-function malloc(size: i64) -> *i8;
-function free(ptr: *i8);
+import libc;
 
 function main() -> i32 {
   // check: 0123456789
-  let x = malloc(10);
+  let x = libc.malloc(10);
   for let i = 0; i < 10; i += 1 {
     x[i] = i as i8;
   }
   for let i = 0; i < 10; i += 1 {
-    printf("%d", x[i]);
+    libc.printf("%d", x[i]);
   }
-  printf("\n");
-  free(x);
+  libc.printf("\n");
+  libc.free(x);
   return 0;
 }

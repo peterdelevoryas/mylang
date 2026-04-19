@@ -1,0 +1,8 @@
+import libc;
+
+function main() -> i32 {
+  libc.printf("hello from libc\n");
+  return 0;
+}
+
+// CHECK: hello from libc

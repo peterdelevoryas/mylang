@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 type Data = struct {
   x: i8,
@@ -10,7 +10,7 @@ function main() -> i32 {
   let x = 1;
   let p = &x;
   // check: 1
-  printf("%d\n", *p);
+  libc.printf("%d\n", *p);
 
   let x: Data = {
     x: 0,
@@ -20,6 +20,6 @@ function main() -> i32 {
   let p = &x;
   let y = *p;
   // check: 0 1 2
-  printf("%d %d %d\n", y.x, y.y, y.z);
+  libc.printf("%d %d %d\n", y.x, y.y, y.z);
   return 0;
 }

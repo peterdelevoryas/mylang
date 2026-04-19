@@ -1,7 +1,7 @@
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 function print(x: (i32, *i8)) {
-  printf("%d %s\n", x.0, x.1);
+  libc.printf("%d %s\n", x.0, x.1);
 }
 
 function map(x: (i32, *i8)) -> (i32, *i8) {

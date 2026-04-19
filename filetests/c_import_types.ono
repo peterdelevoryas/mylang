@@ -1,0 +1,10 @@
+import libc;
+
+function main() -> i32 {
+  let n: libc.size_t = sizeof(libc.size_t);
+  let f: *libc.FILE = null;
+  libc.printf("%ld %d\n", n, f == null);
+  return 0;
+}
+
+// CHECK: 8 1

@@ -1,8 +1,8 @@
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 function add(x: i32, y: i32) -> i32 {
   let z = x + y;
-  printf("%d + %d = %d\n", x, y, z);
+  libc.printf("%d + %d = %d\n", x, y, z);
   return z;
 }
 

@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...) -> i32;
+import libc;
 
 type Mat4 = [4][4]f32;
 
@@ -32,9 +32,9 @@ function matmul(a: Mat4, b: Mat4) -> Mat4 {
 function print(a: Mat4) {
   for let i = 0; i < 4; i += 1 {
     for let j = 0; j < 4; j += 1 {
-      printf("%10.4f  ", a[i][j] as f64);
+      libc.printf("%10.4f  ", a[i][j] as f64);
     }
-    printf("\n");
+    libc.printf("\n");
   }
 }
 

@@ -97,6 +97,10 @@ pub fn build(module: &syntax::Module) -> Module2 {
     b.add_type("bool", Type::Bool);
 
     for type_decl in &module.type_decls {
+        b.predeclare_type_decl(type_decl);
+    }
+
+    for type_decl in &module.type_decls {
         b.add_type_decl(type_decl);
     }
 
@@ -820,6 +824,25 @@ impl ModuleBuilder {
         self.names.def(name, Def::Type(i));
     }
 
+    fn predeclare_type_decl(&mut self, type_decl: &syntax::TypeDecl) {
+        let ty = match &type_decl.kind {
+            syntax::TypeDeclKind::Struct(_) => Some(Type::Struct(StructType {
+                name: type_decl.name,
+                fields: vec![],
+            })),
+            syntax::TypeDeclKind::Enum(_) => Some(Type::Enum(EnumType {
+                name: type_decl.name,
+                variants: vec![],
+            })),
+            syntax::TypeDeclKind::Alias(_) => None,
+        };
+        let Some(ty) = ty else {
+            return;
+        };
+        let i = self.types.intern(ty);
+        self.names.def(type_decl.name, Def::Type(i));
+    }
+
     fn add_const_decl(&mut self, const_decl: &syntax::ConstDecl) -> ConstId {
         let ty = match &const_decl.ty {
             Some(ty) => Some(self.build_type(ty)),
@@ -867,7 +890,7 @@ impl ModuleBuilder {
     }
 
     fn add_type_decl(&mut self, type_decl: &syntax::TypeDecl) {
-        let ty = match &type_decl.kind {
+        match &type_decl.kind {
             syntax::TypeDeclKind::Enum(variants) => {
                 let mut xvariants = vec![];
                 for variant in variants {
@@ -886,7 +909,12 @@ impl ModuleBuilder {
                     name: type_decl.name,
                     variants: xvariants,
                 };
-                self.types.intern(Type::Enum(ty))
+                let id = match self.names.get(type_decl.name) {
+                    Some(Def::Type(i)) => i,
+                    _ => panic!("expected predeclared enum {:?}", type_decl.name),
+                };
+                self.types.types[id] = Type::Enum(ty);
+                id
             }
             syntax::TypeDeclKind::Struct(fields) => {
                 let mut fields2 = vec![];
@@ -898,11 +926,19 @@ impl ModuleBuilder {
                     name: type_decl.name,
                     fields: fields2,
                 };
-                self.types.intern(Type::Struct(sty))
+                let id = match self.names.get(type_decl.name) {
+                    Some(Def::Type(i)) => i,
+                    _ => panic!("expected predeclared struct {:?}", type_decl.name),
+                };
+                self.types.types[id] = Type::Struct(sty);
+                id
             }
-            syntax::TypeDeclKind::Alias(ty) => self.build_type(ty),
+            syntax::TypeDeclKind::Alias(ty) => {
+                let ty = self.build_type(ty);
+                self.names.def(type_decl.name, Def::Type(ty));
+                return;
+            }
         };
-        self.names.def(type_decl.name, Def::Type(ty));
     }
 
     fn add_func_decl(&mut self, func: &syntax::FuncDecl) {
@@ -912,6 +948,7 @@ impl ModuleBuilder {
         let func_type = self.build_func_type(&func.ty);
         let func_decl = FuncDecl {
             name: func.name,
+            link_name: func.link_name,
             ty: func_type,
             params: func.params.clone(),
         };
@@ -933,6 +970,9 @@ impl ModuleBuilder {
                 Some(Def::Type(i)) => i,
                 x => panic!("building type: {:?} def = {:?}", name, x),
             },
+            syntax::Type::Path(namespace, name) => {
+                panic!("unresolved type path {:?}.{:?}", namespace, name)
+            }
             syntax::Type::Pointer(ty) => {
                 let ty = self.build_type(ty);
                 self.types.intern(Type::Pointer(ty))
@@ -1107,6 +1147,7 @@ pub struct FuncType {
 #[derive(Debug)]
 pub struct FuncDecl {
     pub name: String,
+    pub link_name: Option<String>,
     pub params: Vec<String>,
     pub ty: FuncType,
 }

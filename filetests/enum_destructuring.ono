@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 type Expr = enum {
   Int(i32),
@@ -9,12 +9,12 @@ function main() -> i32 {
   // check: 1
   let e = Expr.Int(1);
   let Int(i) = e;
-  printf("%d\n", i);
+  libc.printf("%d\n", i);
 
   // nextln: hello world
   let x = Expr.String("hello world");
   let String(s) = x;
-  printf("%s\n", s);
+  libc.printf("%s\n", s);
 
   return 0;
 }

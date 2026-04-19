@@ -1,6 +1,7 @@
 use crate::error;
 use crate::ir::*;
 use llvm_sys::*;
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ops::Deref;
 use std::ptr;
@@ -58,9 +59,28 @@ pub unsafe fn build(module: &Module2) -> (LLVMTargetMachineRef, LLVMModuleRef) {
     let llconsts = &build_consts(type_bld, &module.consts);
 
     let mut llfuncs = vec![];
-    for func_decl in &module.func_decls {
+    let mut symbols: HashMap<String, usize> = HashMap::new();
+    for (i, func_decl) in module.func_decls.iter().enumerate() {
+        let symbol_name = match func_decl.link_name {
+            Some(name) => name.deref().to_string(),
+            None => func_decl.name.deref().to_string(),
+        };
+        if let Some(&j) = symbols.get(&symbol_name) {
+            if module.func_decls[j].ty != func_decl.ty {
+                println!(
+                    "conflicting declarations for external symbol {:?}: {:?} vs {:?}",
+                    symbol_name,
+                    module.func_decls[j].ty,
+                    func_decl.ty
+                );
+                error();
+            }
+            llfuncs.push(llfuncs[j]);
+            continue;
+        }
+
         let lltype = type_bld.func_type(&func_decl.ty);
-        let mut name = func_decl.name.deref().to_string();
+        let mut name = symbol_name;
         name.push('\0');
         let mut link_name = name.as_ptr() as *const i8;
         if cfg!(target_os = "macos") && name == "readdir\0" {
@@ -68,6 +88,7 @@ pub unsafe fn build(module: &Module2) -> (LLVMTargetMachineRef, LLVMModuleRef) {
         }
         let llfunc = LLVMAddFunction(llmodule, link_name, lltype);
         llfuncs.push(llfunc);
+        symbols.insert(name[..name.len() - 1].to_string(), i);
     }
     let llfuncs = &llfuncs;
 

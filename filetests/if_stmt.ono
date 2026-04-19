@@ -1,15 +1,15 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 function main() -> i32 {
 
   // check: true
   if true {
-    printf("true\n");
+    libc.printf("true\n");
   }
 
   // not: false
   if false {
-    printf("false\n");
+    libc.printf("false\n");
   }
 
   return 0;

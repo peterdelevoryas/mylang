@@ -6,6 +6,7 @@ use std::ops::Deref;
 use std::process::exit;
 use std::sync::{Mutex, OnceLock};
 
+mod c_import;
 mod ir;
 mod llvm;
 mod syntax;
@@ -142,7 +143,8 @@ fn main() {
         }
         Ok(s) => s,
     };
-    let module = syntax::parse(text);
+    let mut module = syntax::parse(text);
+    c_import::rewrite(&mut module);
     let module = ir::build(&module);
     unsafe {
         let (machine, module) = llvm::build(&module);

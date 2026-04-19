@@ -6,6 +6,7 @@ use crate::String;
 #[derive(Debug)]
 pub struct Module<'a> {
     pub text: &'a str,
+    pub import_libc: bool,
     pub const_decls: Vec<ConstDecl>,
     pub type_decls: Vec<TypeDecl>,
     pub func_decls: Vec<FuncDecl>,
@@ -15,6 +16,7 @@ pub struct Module<'a> {
 pub fn parse(text: &str) -> Module<'_> {
     let mut p = Parser {
         text: text,
+        import_libc: false,
         start: 0,
         end: 0,
         token: EOF,
@@ -24,8 +26,18 @@ pub fn parse(text: &str) -> Module<'_> {
     let mut func_decls = vec![];
     let mut func_bodys = vec![];
     let mut const_decls = vec![];
+    while p.token == IMPORT {
+        if p.parse_import_decl() {
+            p.import_libc = true;
+        }
+    }
     while p.token != EOF {
         match p.token {
+            IMPORT => {
+                print_cursor(p.text, p.start, p.end);
+                println!("imports must appear before declarations");
+                error();
+            }
             CONST => {
                 let const_decl = p.parse_const_decl();
                 const_decls.push(const_decl);
@@ -49,13 +61,14 @@ pub fn parse(text: &str) -> Module<'_> {
             }
             _ => {
                 print_cursor(p.text, p.start, p.start + 1);
-                println!("expected type or function");
+                println!("expected const, type, or function");
                 error();
             }
         }
     }
     Module {
         text: text,
+        import_libc: p.import_libc,
         const_decls: const_decls,
         type_decls: type_decls,
         func_decls: func_decls,
@@ -68,6 +81,8 @@ pub enum Token {
     LSHIFT,
     RSHIFT,
     AND,
+    IMPORT,
+    FROM,
     OR,
     XOR,
     ENUM,
@@ -129,6 +144,7 @@ pub use Token::*;
 pub enum Type {
     Unit,
     Name(String),
+    Path(String, String),
     Pointer(Box<Type>),
     Func(Box<FuncType>),
     Array(u32, Box<Type>),
@@ -164,6 +180,7 @@ pub struct FuncType {
 #[derive(Debug)]
 pub struct FuncDecl {
     pub name: String,
+    pub link_name: Option<String>,
     pub params: Vec<String>,
     pub ty: FuncType,
 }
@@ -241,6 +258,7 @@ pub enum ExprKind {
 
 pub struct Parser<'a> {
     pub text: &'a str,
+    pub import_libc: bool,
     pub start: usize,
     pub end: usize,
     pub token: Token,
@@ -263,6 +281,30 @@ fn parse_int(text: &[u8]) -> (Token, usize) {
 }
 
 impl<'a> Parser<'a> {
+    fn parse_import_decl(&mut self) -> bool {
+        self.parse(IMPORT);
+        let start = self.start;
+        let name = self.token_string();
+        self.parse(NAME);
+        if self.token == FROM {
+            print_cursor(self.text, self.start, self.end);
+            println!("C header imports were removed; use `import libc;` and libc.* instead");
+            error();
+        }
+        if name != intern("libc") {
+            print_cursor(self.text, self.start, self.end);
+            println!("only `import libc;` is supported");
+            error();
+        }
+        if self.import_libc {
+            print_cursor(self.text, start, self.end);
+            println!("duplicate `import libc;`");
+            error();
+        }
+        self.parse(SEMICOLON);
+        true
+    }
+
     pub fn next(&mut self) {
         loop {
             let end = self.end;
@@ -352,6 +394,8 @@ impl<'a> Parser<'a> {
                 // keywords
                 let token = match &text[..n] {
                     b"and" => AND,
+                    b"import" => IMPORT,
+                    b"from" => FROM,
                     b"or" => OR,
                     b"xor" => XOR,
                     b"enum" => ENUM,
@@ -553,6 +597,7 @@ impl<'a> Parser<'a> {
 
         FuncDecl {
             name: name,
+            link_name: None,
             params: params,
             ty: ty,
         }
@@ -826,6 +871,11 @@ impl<'a> Parser<'a> {
         let mut e = self.parse_atom();
         while self.token == DOT {
             self.next();
+            if matches!(e.kind, ExprKind::Name(name) if name == intern("libc")) && !self.import_libc {
+                print_cursor(self.text, start, self.end);
+                println!("use `import libc;` before referencing libc.*");
+                error();
+            }
 
             let s = self.token_string();
             let field = match self.token {
@@ -1079,9 +1129,22 @@ impl<'a> Parser<'a> {
                 Type::Array(n, elem_ty.into())
             }
             NAME => {
+                let start = self.start;
                 let name = self.token_string();
                 self.next();
-                Type::Name(name)
+                if self.token == DOT {
+                    self.next();
+                    let field = self.token_string();
+                    self.parse(NAME);
+                    if name == intern("libc") && !self.import_libc {
+                        print_cursor(self.text, start, self.end);
+                        println!("use `import libc;` before referencing libc.*");
+                        error();
+                    }
+                    Type::Path(name, field)
+                } else {
+                    Type::Name(name)
+                }
             }
             STAR => {
                 self.next();

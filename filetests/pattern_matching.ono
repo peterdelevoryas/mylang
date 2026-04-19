@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 type Expr = enum {
   Int(i32),
@@ -7,10 +7,10 @@ type Expr = enum {
 
 function print(e: Expr) {
   if let Int(i) = e {
-    printf("%d\n", i);
+    libc.printf("%d\n", i);
   }
   if let String(s) = e {
-    printf("%s\n", s);
+    libc.printf("%s\n", s);
   }
 }
 

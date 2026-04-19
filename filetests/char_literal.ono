@@ -1,11 +1,11 @@
-function putchar(c: i32) -> i32;
+import libc;
 
 function main() -> i32 {
   // check: ab\
-  putchar('a' as i32);
-  putchar('b' as i32);
-  putchar('\\' as i32);
-  putchar('\n' as i32);
+  libc.putchar('a' as i32);
+  libc.putchar('b' as i32);
+  libc.putchar('\\' as i32);
+  libc.putchar('\n' as i32);
 
   return 0;
 }

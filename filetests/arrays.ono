@@ -1,4 +1,4 @@
-function printf(fmt: *i8, ...);
+import libc;
 
 function main() -> i32 {
   let x: [256]i8;
@@ -13,9 +13,9 @@ function main() -> i32 {
   // nextln: 129
   // check: 255
   for let i = 0; i < 256; i += 1 {
-    printf("%d\n", x[i]);
+    libc.printf("%d\n", x[i]);
   }
-  printf("\n");
+  libc.printf("\n");
 
   return 0;
 }
